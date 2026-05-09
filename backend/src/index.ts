@@ -18,6 +18,8 @@ import productRoutes from './routes/products';
 import customerRoutes from './routes/customers';
 import saleRoutes from './routes/sales';
 import uploadRoutes from './routes/upload';
+import adminRoutes from './routes/admin';
+import moduleRoutes from './routes/modules';
 
 const app = express();
 
@@ -90,6 +92,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/modules', moduleRoutes);
 
 // Error handling
 app.use(notFoundHandler);

@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 
 export type Niche = 'varejo' | 'oficina' | 'clinica' | 'restaurante' | null;
 export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check';
+
+const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
 interface TenantState {
   themeColor: string;
@@ -27,6 +29,16 @@ const initialState: TenantState = {
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
+function syncModulesToBackend(modules: ModuleId[]) {
+  const token = localStorage.getItem('auth_token');
+  if (!token) return;
+  fetch(`${API}/api/modules`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ modules }),
+  }).catch(() => {});
+}
+
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TenantState>(() => {
     const saved = localStorage.getItem('nexus-tenant');
@@ -39,29 +51,33 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const setNiche = (niche: Niche) => setState(s => ({ ...s, niche }));
-  
-  const toggleModule = (id: ModuleId) => setState(s => ({
-    ...s,
-    activeModules: s.activeModules.includes(id) 
-      ? s.activeModules.filter(m => m !== id) // Remove module
-      : [...s.activeModules, id] // Add module
-  }));
 
-  const activateNicheTemplate = (niche: Niche) => {
-    // Core modules for everyone
+  const toggleModule = useCallback((id: ModuleId) => {
+    setState(s => {
+      const next = s.activeModules.includes(id)
+        ? s.activeModules.filter(m => m !== id)
+        : [...s.activeModules, id];
+      syncModulesToBackend(next);
+      return { ...s, activeModules: next };
+    });
+  }, []);
+
+  const activateNicheTemplate = useCallback((niche: Niche) => {
     let modules: ModuleId[] = ['dashboard', 'settings', 'modules', 'customers'];
-    
-    // Add specific modules based on niche
     if (niche === 'varejo') modules.push('pos', 'stock', 'finance');
     if (niche === 'oficina') modules.push('services', 'stock', 'finance', 'pos');
     if (niche === 'clinica') modules.push('services', 'finance');
     if (niche === 'restaurante') modules.push('pos', 'stock', 'finance');
-
     setState(s => ({ ...s, niche, activeModules: modules }));
-  };
+    syncModulesToBackend(modules);
+  }, []);
 
   const completeOnboarding = () => setState(s => ({ ...s, isOnboarded: true }));
-  const resetTenant = () => setState(initialState);
+
+  const resetTenant = () => {
+    setState(initialState);
+    syncModulesToBackend(initialState.activeModules);
+  };
 
   return (
     <TenantContext.Provider value={{ ...state, setNiche, toggleModule, activateNicheTemplate, completeOnboarding, resetTenant }}>

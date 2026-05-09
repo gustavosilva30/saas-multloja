@@ -25,6 +25,7 @@ import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { SuperAdmin } from './pages/SuperAdmin';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TenantProvider } from './contexts/TenantContext';
@@ -80,6 +81,11 @@ function RouterConfig() {
 }
 
 export default function App() {
+  // Rota /superadmin é completamente separada do sistema de auth de tenant
+  if (window.location.pathname.startsWith('/superadmin')) {
+    return <SuperAdmin />;
+  }
+
   return (
     <ThemeProvider defaultTheme="dark">
       <AuthProvider>

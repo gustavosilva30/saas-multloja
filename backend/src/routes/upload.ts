@@ -110,7 +110,7 @@ router.get('/list', async (req: Request, res: Response): Promise<void> => {
     const stream = minioClient.listObjectsV2(BUCKET_NAME, prefix, true);
     const files: any[] = [];
 
-    stream.on('data', (obj) => {
+    stream.on('data', (obj: { name?: string; size?: number; lastModified?: Date }) => {
       files.push({
         name: obj.name,
         size: obj.size,
@@ -123,7 +123,7 @@ router.get('/list', async (req: Request, res: Response): Promise<void> => {
       res.json({ files, count: files.length });
     });
 
-    stream.on('error', (err) => {
+    stream.on('error', (err: Error) => {
       console.error('List error:', err);
       res.status(500).json({ error: 'Failed to list files' });
     });

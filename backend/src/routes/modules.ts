@@ -11,7 +11,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     'SELECT module_id FROM tenant_modules WHERE tenant_id = $1 AND is_active = true',
     [req.user!.tenant_id]
   );
-  res.json({ modules: result.rows.map(r => r.module_id) });
+  res.json({ modules: result.rows.map((r: { module_id: string }) => r.module_id) });
 });
 
 // PUT /api/modules — sincroniza lista completa de módulos ativos

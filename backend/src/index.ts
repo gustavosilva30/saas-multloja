@@ -32,7 +32,7 @@ const allowedOrigins = config.CORS_ORIGIN === '*'
   : config.CORS_ORIGIN.split(',').map(o => o.trim());
 
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     if (!origin || allowedOrigins === '*') return callback(null, true);
     if ((allowedOrigins as string[]).includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));

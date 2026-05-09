@@ -118,8 +118,8 @@ router.post(
 
       // Find user with password
       const userResult = await query(
-        `SELECT id, email, password_hash, role, tenant_id, full_name, is_active 
-         FROM user_profiles WHERE email = $1`,
+        `SELECT id, email, password_hash, role, tenant_id, full_name, is_active
+         FROM user_profiles WHERE LOWER(email) = LOWER($1)`,
         [email]
       );
 

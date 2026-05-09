@@ -31,7 +31,7 @@ async function adminAuth(req: Request, res: Response, next: NextFunction): Promi
 
 // ── POST /api/admin/login ─────────────────────────────────────────────────────
 router.post('/login',
-  [body('email').isEmail().normalizeEmail(), body('password').notEmpty()],
+  [body('email').isEmail(), body('password').notEmpty()],
   async (req: Request, res: Response): Promise<void> => {
     try {
       const errors = validationResult(req);
@@ -39,7 +39,7 @@ router.post('/login',
 
       const { email, password } = req.body;
       const result = await query(
-        'SELECT id, email, full_name, password_hash, is_active FROM platform_admins WHERE email = $1',
+        'SELECT id, email, full_name, password_hash, is_active FROM platform_admins WHERE LOWER(email) = LOWER($1)',
         [email]
       );
       const admin = result.rows[0];

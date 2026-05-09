@@ -59,7 +59,7 @@ if (config.NODE_ENV !== 'test') {
   app.use(morgan(config.NODE_ENV === 'development' ? 'dev' : 'combined'));
 }
 
-// Health check
+// Health check — v2
 app.get('/health', async (req, res) => {
   const checks: Record<string, 'ok' | 'error'> = {};
 

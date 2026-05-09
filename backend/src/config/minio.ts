@@ -14,6 +14,7 @@ export const minioClient = new MinioClient({
   useSSL: process.env.MINIO_USE_SSL === 'true',
   accessKey: process.env.MINIO_ACCESS_KEY,
   secretKey: process.env.MINIO_SECRET_KEY,
+  pathStyle: true,
 });
 
 export const BUCKET_NAME = process.env.MINIO_BUCKET || 'nexus-uploads';

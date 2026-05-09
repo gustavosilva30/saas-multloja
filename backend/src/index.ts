@@ -25,8 +25,16 @@ const app = express();
 app.use(helmet());
 
 // CORS
+const allowedOrigins = config.CORS_ORIGIN === '*'
+  ? '*'
+  : config.CORS_ORIGIN.split(',').map(o => o.trim());
+
 app.use(cors({
-  origin: config.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins === '*') return callback(null, true);
+    if ((allowedOrigins as string[]).includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

@@ -1,8 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { POS } from './pages/POS';
@@ -12,7 +8,6 @@ import { Settings } from './pages/Settings';
 import { Finance } from './pages/Finance';
 import { ModulesStore } from './pages/ModulesStore';
 import { Customers } from './pages/Customers';
-import { Onboarding } from './pages/Onboarding';
 import { Catalog } from './pages/Catalog';
 import { Events } from './pages/Events';
 import { Services } from './pages/Services';
@@ -28,40 +23,41 @@ import { FreightQuote } from './pages/FreightQuote';
 import { CreditCheck } from './pages/CreditCheck';
 import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { TenantProvider, useTenant } from './contexts/TenantContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function RouterConfig() {
-  const { isOnboarded } = useTenant();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
 
-  if (!isOnboarded) {
-    return <Onboarding />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return showRegister
+      ? <Register onSwitchToLogin={() => setShowRegister(false)} />
+      : <Login onSwitchToRegister={() => setShowRegister(true)} />;
   }
 
   return (
     <AppLayout>
       <Routes>
-        {/* Rotas Protegidas - Todas as Roles Autenticadas */}
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute requiredPermission="canManageCustomers"><Customers /></ProtectedRoute>} />
-        
-        {/* Rotas Protegidas - Vendas (Operator+) */}
         <Route path="/pos" element={<ProtectedRoute requiredPermission="canCreateSales"><POS /></ProtectedRoute>} />
-        
-        {/* Rotas Protegidas - Estoque (Operator+) */}
         <Route path="/stock" element={<ProtectedRoute requiredPermission="canManageStock"><Stock /></ProtectedRoute>} />
         <Route path="/catalog" element={<ProtectedRoute requiredPermission="canManageStock"><Catalog /></ProtectedRoute>} />
-        
-        {/* Rotas Protegidas - Financeiro (Admin+ ou Viewer) */}
         <Route path="/finance" element={<ProtectedRoute requiredPermission="canViewFinancialReports"><Finance /></ProtectedRoute>} />
-        
-        {/* Rotas Protegidas - Módulos (Owner) */}
         <Route path="/modules" element={<ProtectedRoute requiredPermission="canManageModules"><ModulesStore /></ProtectedRoute>} />
-        
-        {/* Módulos Premium - Admin+ */}
         <Route path="/events" element={<ProtectedRoute minimumRoleLevel={3}><Events /></ProtectedRoute>} />
         <Route path="/services" element={<ProtectedRoute requiredPermission="canManageStock"><Services /></ProtectedRoute>} />
         <Route path="/automations" element={<ProtectedRoute minimumRoleLevel={3}><Automations /></ProtectedRoute>} />
@@ -76,8 +72,6 @@ function RouterConfig() {
         <Route path="/credit-check" element={<ProtectedRoute minimumRoleLevel={2}><CreditCheck /></ProtectedRoute>} />
         <Route path="/plate-check" element={<ProtectedRoute minimumRoleLevel={2}><PlateCheck /></ProtectedRoute>} />
         <Route path="/bin-check" element={<ProtectedRoute minimumRoleLevel={2}><BinCheck /></ProtectedRoute>} />
-        
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>
@@ -88,11 +82,9 @@ export default function App() {
   return (
     <ThemeProvider defaultTheme="dark">
       <AuthProvider>
-        <TenantProvider>
-          <BrowserRouter>
-            <RouterConfig />
-          </BrowserRouter>
-        </TenantProvider>
+        <BrowserRouter>
+          <RouterConfig />
+        </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
   );

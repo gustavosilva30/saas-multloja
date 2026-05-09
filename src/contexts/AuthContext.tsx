@@ -1,25 +1,81 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { supabase, UserProfile, UserRole, ROLE_PERMISSIONS, RolePermissions, getDefaultRouteForRole } from '@/lib/supabase';
-import type { Session, User } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { authApi, AuthUser } from '@/lib/api';
 
-// ============================================================
-// TIPOS DO CONTEXT
-// ============================================================
+// ─── Tipos ────────────────────────────────────────────────────
+
+export type UserRole = 'owner' | 'admin' | 'operator' | 'viewer';
+
+export interface RolePermissions {
+  level: number;
+  canManageUsers: boolean;
+  canViewFinancialReports: boolean;
+  canViewProfit: boolean;
+  canCreateSales: boolean;
+  canCancelSales: boolean;
+  canManageStock: boolean;
+  canManageCustomers: boolean;
+  canManageModules: boolean;
+  canDelete: boolean;
+}
+
+export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
+  owner: {
+    level: 4,
+    canManageUsers: true,
+    canViewFinancialReports: true,
+    canViewProfit: true,
+    canCreateSales: true,
+    canCancelSales: true,
+    canManageStock: true,
+    canManageCustomers: true,
+    canManageModules: true,
+    canDelete: true,
+  },
+  admin: {
+    level: 3,
+    canManageUsers: true,
+    canViewFinancialReports: true,
+    canViewProfit: true,
+    canCreateSales: true,
+    canCancelSales: true,
+    canManageStock: true,
+    canManageCustomers: true,
+    canManageModules: false,
+    canDelete: true,
+  },
+  operator: {
+    level: 2,
+    canManageUsers: false,
+    canViewFinancialReports: false,
+    canViewProfit: false,
+    canCreateSales: true,
+    canCancelSales: false,
+    canManageStock: true,
+    canManageCustomers: true,
+    canManageModules: false,
+    canDelete: false,
+  },
+  viewer: {
+    level: 1,
+    canManageUsers: false,
+    canViewFinancialReports: true,
+    canViewProfit: false,
+    canCreateSales: false,
+    canCancelSales: false,
+    canManageStock: false,
+    canManageCustomers: false,
+    canManageModules: false,
+    canDelete: false,
+  },
+};
 
 interface AuthContextType {
-  // Estado
-  user: User | null;
-  profile: UserProfile | null;
-  session: Session | null;
+  user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  
-  // RBAC
   role: UserRole | null;
   permissions: RolePermissions | null;
   roleLevel: number;
-  
-  // Helpers de permissão
   hasPermission: (permission: keyof RolePermissions) => boolean;
   isOwner: boolean;
   isAdmin: boolean;
@@ -32,254 +88,109 @@ interface AuthContextType {
   canCancelSales: boolean;
   canManageStock: boolean;
   canDelete: boolean;
-  
-  // Ações
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, userData: { full_name: string; tenant_name: string }) => Promise<{ error: Error | null; tenantId?: string }>;
-  signOut: () => Promise<void>;
+  signUp: (email: string, password: string, userData: { full_name: string; tenant_name: string; niche?: string }) => Promise<{ error: Error | null }>;
+  signOut: () => void;
   refreshProfile: () => Promise<void>;
 }
 
-// ============================================================
-// CONTEXT
-// ============================================================
+// ─── Context ──────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Estados
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ==========================================================
-  // INICIALIZAÇÃO E LISTENERS
-  // ==========================================================
-
+  // Carregar usuário do token salvo
   useEffect(() => {
-    // Verificar sessão existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    // Listener de mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        await loadProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+    authApi.me()
+      .then(({ user }) => setUser(user))
+      .catch(() => localStorage.removeItem('auth_token'))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  // ==========================================================
-  // CARREGAR PERFIL DO USUÁRIO
-  // ==========================================================
-
-  const loadProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data as UserProfile);
-    } catch (err) {
-      console.error('Error loading profile:', err);
-      setProfile(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    await loadProfile(user.id);
-  }, [user]);
-
-  // ==========================================================
-  // RBAC HELPERS (memoizados)
-  // ==========================================================
-
-  const role = profile?.role ?? null;
-  const permissions = role ? ROLE_PERMISSIONS[role] : null;
-  const roleLevel = permissions?.level ?? 0;
-
-  const hasPermission = useCallback((permission: keyof RolePermissions): boolean => {
-    return !!permissions?.[permission];
-  }, [permissions]);
-
-  const isOwner = role === 'owner';
-  const isAdmin = role === 'owner' || role === 'admin';
-  const isOperator = role === 'owner' || role === 'admin' || role === 'operator';
-  const isViewer = role === 'viewer';
-
-  const canManageUsers = hasPermission('canManageUsers');
-  const canViewFinancialReports = hasPermission('canViewFinancialReports');
-  const canViewProfit = hasPermission('canViewProfit');
-  const canCreateSales = hasPermission('canCreateSales');
-  const canCancelSales = hasPermission('canCancelSales');
-  const canManageStock = hasPermission('canManageStock');
-  const canDelete = role === 'owner' || role === 'admin';
-
-  // ==========================================================
-  // AUTH ACTIONS
-  // ==========================================================
+    try {
+      const { user } = await authApi.me();
+      setUser(user);
+    } catch {
+      // token inválido
+    }
+  }, []);
 
   const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
+      const { token, user } = await authApi.login(email, password);
+      localStorage.setItem('auth_token', token);
+      setUser(user);
+      return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
   };
 
   const signUp = async (
-    email: string, 
-    password: string, 
-    userData: { full_name: string; tenant_name: string }
-  ): Promise<{ error: Error | null; tenantId?: string }> => {
+    email: string,
+    password: string,
+    userData: { full_name: string; tenant_name: string; niche?: string }
+  ): Promise<{ error: Error | null }> => {
     try {
-      // 1. Criar usuário no Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError || !authData.user) {
-        return { error: authError || new Error('Failed to create user') };
-      }
-
-      // 2. Criar tenant
-      const { data: tenantData, error: tenantError } = await supabase
-        .from('tenants')
-        .insert([{ name: userData.tenant_name }])
-        .select()
-        .single();
-
-      if (tenantError || !tenantData) {
-        return { error: tenantError || new Error('Failed to create tenant') };
-      }
-
-      // 3. Criar perfil do usuário como OWNER
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([{
-          id: authData.user.id,
-          tenant_id: tenantData.id,
-          email: email,
-          full_name: userData.full_name,
-          role: 'owner',
-          is_active: true,
-        }]);
-
-      if (profileError) {
-        return { error: profileError };
-      }
-
-      return { error: null, tenantId: tenantData.id };
+      const { token, user } = await authApi.register({ email, password, ...userData });
+      localStorage.setItem('auth_token', token);
+      setUser(user);
+      return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
   };
 
-  const signOut = async (): Promise<void> => {
-    await supabase.auth.signOut();
+  const signOut = () => {
+    localStorage.removeItem('auth_token');
     setUser(null);
-    setProfile(null);
-    setSession(null);
   };
 
-  // ==========================================================
-  // PROVIDER VALUE
-  // ==========================================================
+  // RBAC
+  const role = (user?.role ?? null) as UserRole | null;
+  const permissions = role ? ROLE_PERMISSIONS[role] : null;
+  const roleLevel = permissions?.level ?? 0;
+  const hasPermission = useCallback((p: keyof RolePermissions) => !!permissions?.[p], [permissions]);
 
   const value: AuthContextType = {
     user,
-    profile,
-    session,
     isLoading,
-    isAuthenticated: !!user && !!profile,
+    isAuthenticated: !!user,
     role,
     permissions,
     roleLevel,
     hasPermission,
-    isOwner,
-    isAdmin,
-    isOperator,
-    isViewer,
-    canManageUsers,
-    canViewFinancialReports,
-    canViewProfit,
-    canCreateSales,
-    canCancelSales,
-    canManageStock,
-    canDelete,
+    isOwner: role === 'owner',
+    isAdmin: role === 'owner' || role === 'admin',
+    isOperator: role === 'owner' || role === 'admin' || role === 'operator',
+    isViewer: role === 'viewer',
+    canManageUsers: hasPermission('canManageUsers'),
+    canViewFinancialReports: hasPermission('canViewFinancialReports'),
+    canViewProfit: hasPermission('canViewProfit'),
+    canCreateSales: hasPermission('canCreateSales'),
+    canCancelSales: hasPermission('canCancelSales'),
+    canManageStock: hasPermission('canManageStock'),
+    canDelete: hasPermission('canDelete'),
     signIn,
     signUp,
     signOut,
     refreshProfile,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-// ============================================================
-// HOOK
-// ============================================================
 
 export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-// ============================================================
-// HOC PARA PROTEÇÃO DE COMPONENTES
-// ============================================================
-
-export function withAuth<P extends object>(
-  Component: React.ComponentType<P>,
-  requiredPermission?: keyof RolePermissions
-) {
-  return function WithAuthComponent(props: P) {
-    const { isLoading, isAuthenticated, hasPermission } = useAuth();
-
-    if (isLoading) {
-      return <div>Carregando...</div>;
-    }
-
-    if (!isAuthenticated) {
-      window.location.href = '/login';
-      return null;
-    }
-
-    if (requiredPermission && !hasPermission(requiredPermission)) {
-      return <div>Acesso negado. Você não tem permissão para visualizar esta página.</div>;
-    }
-
-    return <Component {...props} />;
-  };
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 }

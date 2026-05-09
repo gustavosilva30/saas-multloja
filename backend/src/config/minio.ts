@@ -4,12 +4,16 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // MinIO client configuration
+if (!process.env.MINIO_SECRET_KEY || !process.env.MINIO_ACCESS_KEY) {
+  throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables are required');
+}
+
 export const minioClient = new MinioClient({
   endPoint: process.env.MINIO_ENDPOINT || 'localhost',
   port: parseInt(process.env.MINIO_PORT || '9000'),
   useSSL: process.env.MINIO_USE_SSL === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || 'nexus',
-  secretKey: process.env.MINIO_SECRET_KEY || 'minio_password_2024',
+  accessKey: process.env.MINIO_ACCESS_KEY,
+  secretKey: process.env.MINIO_SECRET_KEY,
 });
 
 export const BUCKET_NAME = process.env.MINIO_BUCKET || 'nexus-uploads';

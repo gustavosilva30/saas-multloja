@@ -8,7 +8,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { config } from './config';
-import { initializeBucket } from './config/minio';
+import { initializeBucket, minioClient, BUCKET_NAME } from './config/minio';
+import { pool as dbPool } from './config/database';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Import routes
@@ -49,11 +50,29 @@ if (config.NODE_ENV !== 'test') {
 }
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+app.get('/health', async (req, res) => {
+  const checks: Record<string, 'ok' | 'error'> = {};
+
+  try {
+    await dbPool.query('SELECT 1');
+    checks.database = 'ok';
+  } catch {
+    checks.database = 'error';
+  }
+
+  try {
+    await minioClient.bucketExists(BUCKET_NAME);
+    checks.storage = 'ok';
+  } catch {
+    checks.storage = 'error';
+  }
+
+  const healthy = Object.values(checks).every((v) => v === 'ok');
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
-    environment: config.NODE_ENV 
+    environment: config.NODE_ENV,
+    checks,
   });
 });
 

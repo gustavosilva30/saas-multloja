@@ -1,7 +1,19 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { RolePermissions, ROUTE_PERMISSIONS, getDefaultRouteForRole } from '@/lib/supabase';
+import { useAuth, RolePermissions, UserRole } from '@/contexts/AuthContext';
+
+function getDefaultRouteForRole(role: UserRole | null): string {
+  return '/';
+}
+
+const ROUTE_PERMISSIONS: Record<string, keyof RolePermissions> = {
+  '/finance': 'canViewFinancialReports',
+  '/stock': 'canManageStock',
+  '/catalog': 'canManageStock',
+  '/customers': 'canManageCustomers',
+  '/pos': 'canCreateSales',
+  '/modules': 'canManageModules',
+};
 
 // ============================================================
 // TIPOS

@@ -33,11 +33,13 @@ import {
 import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
 import { useTenant } from "../contexts/TenantContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { activeModules, resetTenant } = useTenant();
+  const { user, signOut } = useAuth();
 
   const allNavItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -116,12 +118,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
              </div>
           </button>
 
-          <button className="flex items-center gap-3 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors px-3 py-2 w-full text-left">
+          <button onClick={signOut} className="flex items-center gap-3 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors px-3 py-2 w-full text-left">
              <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 overflow-hidden flex items-center justify-center">
-               <span className="text-xs">U</span>
+               <span className="text-xs uppercase">{user?.full_name?.[0] ?? 'U'}</span>
              </div>
              <div className="flex flex-col flex-1 overflow-hidden">
-               <span className="truncate">Usuário Admin</span>
+               <span className="truncate">{user?.full_name ?? 'Usuário'}</span>
                <span className="text-xs opacity-70">Sair</span>
              </div>
           </button>

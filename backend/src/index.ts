@@ -9,7 +9,7 @@ dotenv.config();
 
 import { config } from './config';
 import { initializeBucket, minioClient, BUCKET_NAME } from './config/minio';
-import { pool as dbPool } from './config/database';
+import { pool as dbPool, runMigrations } from './config/database';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Import routes
@@ -112,6 +112,9 @@ async function startServer() {
     console.log(`📊 Environment: ${config.NODE_ENV}`);
     console.log(`🔒 CORS Origin: ${config.CORS_ORIGIN}`);
   });
+
+  // Run DB migrations (creates missing tables)
+  await runMigrations();
 
   // Initialize MinIO in background — failure won't crash the server
   initializeBucket()

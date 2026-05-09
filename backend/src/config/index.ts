@@ -41,6 +41,10 @@ export const config = {
   // Upload
   MAX_FILE_SIZE: parseInt(optional('MAX_FILE_SIZE', '10485760')),
   UPLOAD_PATH: optional('UPLOAD_PATH', './uploads'),
+
+  // Asaas — gateway de pagamento
+  ASAAS_API_KEY: optional('ASAAS_API_KEY', ''),
+  ASAAS_API_URL: optional('ASAAS_API_URL', 'https://sandbox.asaas.com'),
 };
 
 export default config;

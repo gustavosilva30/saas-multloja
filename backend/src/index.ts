@@ -20,6 +20,7 @@ import saleRoutes from './routes/sales';
 import uploadRoutes from './routes/upload';
 import adminRoutes from './routes/admin';
 import moduleRoutes from './routes/modules';
+import webhookRoutes from './routes/webhooks';
 
 const app = express();
 
@@ -97,6 +98,7 @@ app.use('/api/sales', saleRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/modules', moduleRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Error handling
 app.use(notFoundHandler);

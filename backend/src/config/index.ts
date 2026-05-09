@@ -2,36 +2,45 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-export const config = {
-  // Server
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  PORT: parseInt(process.env.PORT || '3000'),
-  
-  // JWT
-  JWT_SECRET: process.env.JWT_SECRET || 'sua_chave_secreta_aqui_minimo_32_caracteres',
-  JWT_EXPIRES_IN: (process.env.JWT_EXPIRES_IN || '7d') as string,
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
 
-  // Database
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm-loja',
+function optional(name: string, fallback: string): string {
+  return process.env[name] || fallback;
+}
+
+export const config = {
+  NODE_ENV: optional('NODE_ENV', 'production'),
+  PORT: parseInt(optional('PORT', '3000')),
+
+  // JWT — obrigatório, sem fallback
+  JWT_SECRET: required('JWT_SECRET'),
+  JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
+
+  // Database — obrigatório, sem fallback
+  DATABASE_URL: required('DATABASE_URL'),
 
   // MinIO
-  MINIO_ENDPOINT: process.env.MINIO_ENDPOINT || 'localhost',
-  MINIO_PORT: parseInt(process.env.MINIO_PORT || '9000'),
+  MINIO_ENDPOINT: optional('MINIO_ENDPOINT', 'localhost'),
+  MINIO_PORT: parseInt(optional('MINIO_PORT', '9000')),
   MINIO_USE_SSL: process.env.MINIO_USE_SSL === 'true',
-  MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY || 'admin',
-  MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY || '',
-  MINIO_BUCKET: process.env.MINIO_BUCKET || 'nexus-uploads',
-  
+  MINIO_ACCESS_KEY: optional('MINIO_ACCESS_KEY', 'minioadmin'),
+  MINIO_SECRET_KEY: optional('MINIO_SECRET_KEY', ''),
+  MINIO_BUCKET: optional('MINIO_BUCKET', 'nexus-uploads'),
+
   // CORS
-  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
-  
+  CORS_ORIGIN: optional('CORS_ORIGIN', 'https://gsntech.com.br,https://www.gsntech.com.br'),
+
   // Rate Limiting
-  RATE_LIMIT_WINDOW: parseInt(process.env.RATE_LIMIT_WINDOW || '900000'), // 15 min
-  RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || '100'),
-  
+  RATE_LIMIT_WINDOW: parseInt(optional('RATE_LIMIT_WINDOW', '900000')),
+  RATE_LIMIT_MAX: parseInt(optional('RATE_LIMIT_MAX', '100')),
+
   // Upload
-  MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || '10485760'), // 10MB
-  UPLOAD_PATH: process.env.UPLOAD_PATH || './uploads',
+  MAX_FILE_SIZE: parseInt(optional('MAX_FILE_SIZE', '10485760')),
+  UPLOAD_PATH: optional('UPLOAD_PATH', './uploads'),
 };
 
 export default config;

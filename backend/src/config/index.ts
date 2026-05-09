@@ -9,17 +9,17 @@ export const config = {
   
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'sua_chave_secreta_aqui_minimo_32_caracteres',
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
-  
+  JWT_EXPIRES_IN: (process.env.JWT_EXPIRES_IN || '7d') as string,
+
   // Database
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://nexus:nexus_password_2024@localhost:5432/nexus_erp',
-  
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/crm-loja',
+
   // MinIO
   MINIO_ENDPOINT: process.env.MINIO_ENDPOINT || 'localhost',
   MINIO_PORT: parseInt(process.env.MINIO_PORT || '9000'),
   MINIO_USE_SSL: process.env.MINIO_USE_SSL === 'true',
-  MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY || 'nexus',
-  MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY || 'minio_password_2024',
+  MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY || 'admin',
+  MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY || '',
   MINIO_BUCKET: process.env.MINIO_BUCKET || 'nexus-uploads',
   
   // CORS

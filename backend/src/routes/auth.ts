@@ -80,7 +80,7 @@ router.post(
           tenantId: result.tenant_id,
         } as JWTPayload,
         config.JWT_SECRET,
-        { expiresIn: config.JWT_EXPIRES_IN }
+        { expiresIn: config.JWT_EXPIRES_IN as any }
       );
 
       res.status(201).json({
@@ -158,7 +158,7 @@ router.post(
           tenantId: user.tenant_id,
         } as JWTPayload,
         config.JWT_SECRET,
-        { expiresIn: config.JWT_EXPIRES_IN }
+        { expiresIn: config.JWT_EXPIRES_IN as any }
       );
 
       res.json({
@@ -272,7 +272,7 @@ router.post('/refresh', authenticateToken, async (req: Request, res: Response): 
         tenantId: req.user!.tenant_id,
       } as JWTPayload,
       config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRES_IN }
+      { expiresIn: config.JWT_EXPIRES_IN as any }
     );
 
     res.json({ token });

@@ -91,21 +91,17 @@ app.use(errorHandler);
 const PORT = config.PORT;
 
 async function startServer() {
-  try {
-    // Initialize MinIO bucket
-    await initializeBucket();
-    console.log('✅ MinIO bucket initialized');
+  // Start server first — MinIO is optional for core API routes
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${config.NODE_ENV}`);
+    console.log(`🔒 CORS Origin: ${config.CORS_ORIGIN}`);
+  });
 
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 Environment: ${config.NODE_ENV}`);
-      console.log(`🔒 CORS Origin: ${config.CORS_ORIGIN}`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
+  // Initialize MinIO in background — failure won't crash the server
+  initializeBucket()
+    .then(() => console.log('✅ MinIO bucket initialized'))
+    .catch((err) => console.warn('⚠️  MinIO unavailable (uploads disabled):', err.message));
 }
 
 startServer();

@@ -23,6 +23,9 @@ import moduleRoutes from './routes/modules';
 
 const app = express();
 
+// Trust Traefik/reverse proxy (Easypanel)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 

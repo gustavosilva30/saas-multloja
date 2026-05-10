@@ -22,7 +22,9 @@
       "Bash(xargs grep -l \"payment_method\\\\|sales\")",
       "Bash(xargs grep -l \"IMAGENS DO PRODUTO\\\\|product.*wizard\\\\|ProductWizard\\\\|EditProduct\\\\|NewProduct\")",
       "Bash(xargs grep -l \"import\\\\|from\")",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(grep -v \"tenant_id = \\\\$\\\\|tenant_id =\")",
+      "Bash(xargs ls -la)"
     ]
   }
 }

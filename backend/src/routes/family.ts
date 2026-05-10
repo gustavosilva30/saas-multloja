@@ -10,7 +10,7 @@ router.use(authenticateToken, tenantIsolation);
 const wrap = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
   (req: Request, res: Response, next: NextFunction) => fn(req, res, next).catch(next);
 
-const tid  = (req: Request) => (req as any).tenantId as string;
+const tid  = (req: Request) => req.user!.tenant_id;
 const gid  = (req: Request) => req.params.groupId;
 
 // Valida que o grupo pertence ao tenant

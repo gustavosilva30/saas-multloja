@@ -22,7 +22,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const wrap = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
   (req: Request, res: Response, next: NextFunction) => fn(req, res, next).catch(next);
 
-const tid = (req: Request) => (req as any).tenantId as string;
+const tid = (req: Request) => req.user!.tenant_id;
 
 // ── Bank Accounts ─────────────────────────────────────────────────────────────
 

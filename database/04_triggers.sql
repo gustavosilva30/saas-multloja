@@ -1,7 +1,7 @@
 -- ============================================================================
 -- NEXUSERP - 04: TRIGGERS E FUNÇÕES AUXILIARES
 -- ============================================================================
--- Execute este arquivo QUARTO no Supabase SQL Editor
+-- Execute este arquivo QUARTO no PostgreSQL
 -- Cria triggers para updated_at automático
 -- ============================================================================
 

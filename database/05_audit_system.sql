@@ -1,7 +1,7 @@
 -- ============================================================================
 -- NEXUSERP - 05: SISTEMA DE AUDITORIA (AUDIT LOGS)
 -- ============================================================================
--- Execute este arquivo QUINTO no Supabase SQL Editor
+-- Execute este arquivo QUINTO no PostgreSQL
 -- Cria triggers de auditoria para rastrear todas as alterações
 -- ============================================================================
 

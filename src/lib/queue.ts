@@ -447,7 +447,6 @@ function logAuditEvent(event: AuditEvent): void {
     timestamp: new Date().toISOString(),
   };
   
-  // Em produção: enviar para Supabase audit_logs
   console.log('[AUDIT]', fullEvent);
   
   // Tentar salvar no localStorage para demo

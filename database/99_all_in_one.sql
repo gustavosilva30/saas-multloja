@@ -2,7 +2,7 @@
 -- NEXUSERP - SCRIPT COMPLETO (ALL-IN-ONE)
 -- ============================================================================
 -- ATENÇÃO: Este arquivo concatena TODOS os scripts SQL
--- Execute no Supabase SQL Editor para configurar tudo de uma vez
+-- Execute no PostgreSQL para configurar tudo de uma vez
 -- 
 -- ORDEM INCLUÍDA:
 -- 1. Schema e Tabelas
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Perfil de usuário vinculado ao auth.users do Supabase
+-- Perfil de usuário
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -510,7 +510,7 @@ ON CONFLICT (id) DO NOTHING;
 \echo '========================================'
 \echo ''
 \echo 'Próximos passos:'
-\echo '1. Configure o Auth Hook no Dashboard do Supabase'
+\echo '1. Configure o Auth Hook no PostgreSQL'
 \echo '2. Configure as URLs de redirecionamento'
 \echo '3. Teste a conexão com sua aplicação'
 \echo '4. Consulte database/README.md para mais detalhes'

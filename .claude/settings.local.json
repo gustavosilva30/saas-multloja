@@ -20,7 +20,9 @@
       "Bash(node -e \"require\\('axios'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('react:', p.dependencies.react, 'typescript:', p.devDependencies?.typescript\\)\")",
       "Bash(xargs grep -l \"payment_method\\\\|sales\")",
-      "Bash(xargs grep -l \"IMAGENS DO PRODUTO\\\\|product.*wizard\\\\|ProductWizard\\\\|EditProduct\\\\|NewProduct\")"
+      "Bash(xargs grep -l \"IMAGENS DO PRODUTO\\\\|product.*wizard\\\\|ProductWizard\\\\|EditProduct\\\\|NewProduct\")",
+      "Bash(xargs grep -l \"import\\\\|from\")",
+      "Bash(npm uninstall *)"
     ]
   }
 }

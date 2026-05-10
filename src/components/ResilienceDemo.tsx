@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { queue, Job } from '@/lib/queue';
-import { AuditLog, auditApi } from '@/lib/supabase';
 import { ErrorBoundary, MiniErrorBoundary } from './ErrorBoundary';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -203,28 +202,23 @@ function CrashComponent(): JSX.Element {
 // 3. DEMO DE AUDIT LOGS
 // ============================================================
 
+interface AuditLog { id: string; created_at: string; user_email: string; action: string; entity_type: string; entity_id: string; changed_fields?: string[]; }
+
 function AuditLogDemo() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const { profile } = useAuth();
 
   const loadLogs = async () => {
     setLoading(true);
-    const { data } = await auditApi.list({ limit: 10 });
-    setLogs(data || []);
+    try {
+      const res = await fetch('/api/audit-logs?limit=10', { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } });
+      const d = await res.json().catch(() => ({}));
+      setLogs(d.logs || []);
+    } catch { setLogs([]); }
     setLoading(false);
   };
 
-  const loadSuspicious = async () => {
-    setLoading(true);
-    const { data } = await auditApi.getSuspiciousChanges();
-    setLogs(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadLogs();
-  }, []);
+  useEffect(() => { loadLogs(); }, []);
 
   const getActionColor = (action: string) => {
     switch (action) {
@@ -244,13 +238,6 @@ function AuditLogDemo() {
           className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
         >
           📝 Carregar Logs
-        </button>
-        <button
-          onClick={loadSuspicious}
-          disabled={loading}
-          className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-        >
-          🚨 Alterações Suspeitas
         </button>
       </div>
 

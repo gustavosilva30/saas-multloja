@@ -1,7 +1,7 @@
 -- ============================================================================
 -- NEXUSERP - 01: SCHEMA E TABELAS BASE
 -- ============================================================================
--- Execute este arquivo PRIMEIRO no Supabase SQL Editor
+-- Execute este arquivo PRIMEIRO no PostgreSQL
 -- Cria todas as tabelas, índices e constraints
 -- ============================================================================
 
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Perfil de usuário vinculado ao auth.users do Supabase
+-- Perfil de usuário
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,

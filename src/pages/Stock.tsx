@@ -105,20 +105,17 @@ function fmtBRL(v: number) {
 
 function StatusBadge({ status }: { status: 'ok' | 'low' | 'out' }) {
   if (status === 'ok') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
       Em Estoque
     </span>
   );
   if (status === 'low') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
       Estoque Baixo
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700">
-      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-500">
       Esgotado
     </span>
   );
@@ -797,77 +794,72 @@ export function Stock() {
     { label: 'Valor em estoque', value: fmtBRL(Number(stats.stock_value)), color: 'text-emerald-600' },
   ] : [];
 
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
       {/* Page header */}
-      <div className="px-6 pt-6 pb-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold dark:text-white">Estoque (Catálogo)</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">{stats?.total_products ?? '—'} produtos cadastrados</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={load} className="p-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
-              <RefreshCw size={16} />
-            </button>
-            <button
-              onClick={() => { setDrawerProduct(null); setDrawerOpen(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
-            >
-              <Plus size={16} /> Adicionar Produto
-            </button>
-          </div>
-        </div>
+      <div className="px-6 pt-5 pb-4 bg-white">
+        <div className="flex items-center gap-4 mb-1">
+          <h1 className="text-xl font-bold text-zinc-800 shrink-0">Estoque (Catálogo)</h1>
 
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {statItems.map(s => (
-              <div key={s.label} className="bg-zinc-50 dark:bg-zinc-800 rounded-xl px-4 py-3">
-                <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
-                <p className={cn('text-lg font-bold', s.color)}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-48">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <div className="relative flex-1 max-w-2xl">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               value={search} onChange={e => handleSearch(e.target.value)}
-              placeholder="Buscar por nome, SKU ou código de barras..."
-              className="w-full pl-8 pr-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500 dark:text-white transition-colors"
+              placeholder="Buscar"
+              className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-zinc-300 focus:bg-white text-zinc-700 placeholder:text-zinc-400 transition-all"
             />
           </div>
+
           <div className="relative">
-            <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <select
-              value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-              className="pl-8 pr-6 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500 dark:text-white appearance-none transition-colors"
+            <button
+              onClick={() => setFilterMenuOpen(o => !o)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
             >
-              <option value="">Todas as categorias</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.product_count})</option>)}
-            </select>
-            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+              <Filter size={14} /> Filtro
+            </button>
+            {filterMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-zinc-200 rounded-lg shadow-lg p-3 z-30 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Categoria</label>
+                  <select
+                    value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-md text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">Todas</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.product_count})</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Status</label>
+                  <select
+                    value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-white border border-zinc-200 rounded-md text-sm focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">Todos</option>
+                    <option value="active">Ativos</option>
+                    <option value="inactive">Inativos</option>
+                  </select>
+                </div>
+                <button onClick={load} className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-zinc-600 hover:bg-zinc-50 border border-zinc-200">
+                  <RefreshCw size={12} /> Recarregar
+                </button>
+              </div>
+            )}
           </div>
-          <div className="relative">
-            <select
-              value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-              className="pl-3 pr-6 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-emerald-500 dark:text-white appearance-none transition-colors"
-            >
-              <option value="">Todos os status</option>
-              <option value="active">Ativos</option>
-              <option value="inactive">Inativos</option>
-            </select>
-            <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-          </div>
+
+          <button
+            onClick={() => { setDrawerProduct(null); setDrawerOpen(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium transition-colors shadow-sm shrink-0"
+          >
+            Adicionar Produto
+          </button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-6">
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -879,88 +871,80 @@ export function Stock() {
             <p className="text-xs mt-1">Tente outros filtros ou adicione um produto</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 z-10">
-              <tr>
-                <th className="w-10 px-4 py-3">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead>
+              <tr className="bg-white">
+                <th className="w-10 px-3 py-3 text-left border-b border-zinc-200">
                   <input
                     type="checkbox"
                     checked={selected.size === products.length && products.length > 0}
                     onChange={toggleSelectAll}
-                    className="rounded border-zinc-300 dark:border-zinc-600 accent-emerald-600"
+                    className="rounded border-zinc-300 accent-emerald-500"
                   />
                 </th>
-                <th className="w-14 px-2 py-3" />
-                <th className="px-3 py-3 text-left font-semibold text-xs text-zinc-500 uppercase tracking-wide">SKU</th>
-                <th className="px-3 py-3 text-left font-semibold text-xs text-zinc-500 uppercase tracking-wide">Nome do Produto</th>
+                <th className="w-14 px-2 py-3 border-b border-zinc-200" />
+                <th className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200">SKU</th>
+                <th className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200">Nome de Produto</th>
                 {nicheTemplate && nicheTemplate.form_schema.slice(0, 2).map(f => (
-                  <th key={f.key} className="px-3 py-3 text-left font-semibold text-xs text-zinc-500 uppercase tracking-wide hidden lg:table-cell">{f.label}</th>
+                  <th key={f.key} className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200 hidden lg:table-cell">{f.label}</th>
                 ))}
-                <th className="px-3 py-3 text-left font-semibold text-xs text-zinc-500 uppercase tracking-wide">Status</th>
-                <th className="px-3 py-3 text-right font-semibold text-xs text-zinc-500 uppercase tracking-wide">Preço</th>
-                <th className="px-3 py-3 text-center font-semibold text-xs text-zinc-500 uppercase tracking-wide">Ações</th>
+                <th className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200">Status de Estoque</th>
+                <th className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200">Preço</th>
+                <th className="px-3 py-3 text-left font-medium text-xs text-zinc-500 border-b border-zinc-200 w-24">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <tbody>
               {products.map(p => (
                 <tr
                   key={p.id}
                   className={cn(
-                    'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors',
-                    selected.has(p.id) && 'bg-emerald-50 dark:bg-emerald-900/10'
+                    'group hover:bg-zinc-50/70 transition-colors',
+                    selected.has(p.id) && 'bg-emerald-50/40'
                   )}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 border-b border-zinc-100">
                     <input
                       type="checkbox"
                       checked={selected.has(p.id)}
                       onChange={() => toggleSelect(p.id)}
-                      className="rounded border-zinc-300 dark:border-zinc-600 accent-emerald-600"
+                      className="rounded border-zinc-300 accent-emerald-500"
                     />
                   </td>
-                  <td className="px-2 py-3">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                  <td className="px-2 py-2 border-b border-zinc-100">
+                    <div className="w-9 h-9 rounded-md overflow-hidden bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0">
                       {p.image_url
                         ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                        : <Package size={18} className="text-zinc-400" />
+                        : <Package size={16} className="text-zinc-300" />
                       }
                     </div>
                   </td>
-                  <td className="px-3 py-3">
-                    <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
-                      {p.sku}
-                    </span>
+                  <td className="px-3 py-3 border-b border-zinc-100">
+                    <span className="text-sm text-zinc-700">{p.sku}</span>
                   </td>
-                  <td className="px-3 py-3">
-                    <p className="font-medium text-zinc-900 dark:text-white leading-tight">{p.name}</p>
-                    {p.category_name && (
-                      <p className="text-xs text-zinc-400 mt-0.5">{p.category_name}</p>
-                    )}
+                  <td className="px-3 py-3 border-b border-zinc-100 max-w-xs">
+                    <p className="text-sm text-zinc-700 truncate">{p.name}</p>
                   </td>
                   {nicheTemplate && nicheTemplate.form_schema.slice(0, 2).map(f => (
-                    <td key={f.key} className="px-3 py-3 hidden lg:table-cell">
-                      <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                        {(p.metadata?.[f.key] as string) ?? '—'}
+                    <td key={f.key} className="px-3 py-3 border-b border-zinc-100 hidden lg:table-cell max-w-xs">
+                      <span className="text-xs text-zinc-500 line-clamp-2">
+                        {(p.metadata?.[f.key] as string) || '—'}
                       </span>
                     </td>
                   ))}
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col gap-1">
-                      <StatusBadge status={stockStatus(p)} />
-                      <span className="text-xs text-zinc-400">{p.stock_quantity} {p.unit}</span>
-                    </div>
+                  <td className="px-3 py-3 border-b border-zinc-100">
+                    <StatusBadge status={stockStatus(p)} />
                   </td>
-                  <td className="px-3 py-3 text-right">
-                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">{fmtBRL(p.sale_price)}</span>
+                  <td className="px-3 py-3 border-b border-zinc-100">
+                    <span className="text-sm text-zinc-700">{fmtBRL(p.sale_price)}</span>
                   </td>
-                  <td className="px-3 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
+                  <td className="px-3 py-3 border-b border-zinc-100">
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setAdjustTarget(p)}
-                        className="px-2 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 transition-colors"
-                        title="Ajustar estoque"
+                        onClick={() => { setDrawerProduct(p); setDrawerOpen(true); }}
+                        className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-500 hover:text-zinc-800 transition-colors"
+                        title="Editar"
                       >
-                        Qtd
+                        <Pencil size={14} />
                       </button>
                       <KebabMenu
                         onEdit={() => { setDrawerProduct(p); setDrawerOpen(true); }}

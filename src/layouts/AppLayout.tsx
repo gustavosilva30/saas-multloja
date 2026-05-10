@@ -5,7 +5,7 @@ import {
   Bell, Search, Moon, Sun, Monitor, Component, Wrench, FileSearch,
   Ticket, Zap, Mic, Store, Megaphone, Smartphone, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  ChevronDown, Tag, Menu, X,
+  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
@@ -15,34 +15,34 @@ import { useAuth } from "../contexts/AuthContext";
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
 interface NavItem { id: string; icon: ElementType; label: string; path: string; }
-interface NavGroup { label: string; items: NavItem[]; }
+interface NavGroup { label: string; icon: ElementType; items: NavItem[]; }
 
 const ALL_GROUPS: NavGroup[] = [
   {
-    label: 'Principal',
+    label: 'Principal', icon: LayoutDashboard,
     items: [
       { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/' },
       { id: 'pos',       icon: ShoppingCart,    label: 'PDV',        path: '/pos' },
     ],
   },
   {
-    label: 'Catálogo',
+    label: 'Catálogo', icon: Folder,
     items: [
-      { id: 'stock',   icon: Box,        label: 'Estoque',         path: '/stock' },
+      { id: 'stock',   icon: Box,        label: 'Produtos',         path: '/stock' },
       { id: 'catalog', icon: FileSearch, label: 'Catálogo/Matriz', path: '/catalog' },
     ],
   },
   {
-    label: 'Vendas',
+    label: 'Vendas', icon: ShoppingBag,
     items: [
       { id: 'customers', icon: Users,    label: 'Clientes',   path: '/customers' },
       { id: 'finance',   icon: BarChart3,label: 'Financeiro', path: '/finance' },
-      { id: 'services',  icon: Wrench,   label: 'Serviços/OS',path: '/services' },
+      { id: 'services',  icon: WrenchIcon,label: 'Serviços/OS',path: '/services' },
       { id: 'events',    icon: Ticket,   label: 'Eventos',    path: '/events' },
     ],
   },
   {
-    label: 'Marketing & Crescimento',
+    label: 'Marketing', icon: Sparkles,
     items: [
       { id: 'ecommerce',  icon: Store,      label: 'E-commerce', path: '/ecommerce' },
       { id: 'marketing',  icon: Megaphone,  label: 'Marketing',  path: '/marketing' },
@@ -51,7 +51,7 @@ const ALL_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Operações',
+    label: 'Operações', icon: Phone,
     items: [
       { id: 'delivery',     icon: Smartphone,label: 'Entregas',  path: '/delivery' },
       { id: 'freight_quote',icon: Truck,     label: 'Frete',     path: '/freight-quote' },
@@ -61,7 +61,7 @@ const ALL_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Consultas',
+    label: 'Consultas', icon: FileQuestion,
     items: [
       { id: 'credit_check',icon: ShieldCheck,label: 'SCPC',  path: '/credit-check' },
       { id: 'plate_check', icon: CarFront,   label: 'Placa', path: '/plate-check' },
@@ -69,7 +69,7 @@ const ALL_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Configurações',
+    label: 'Configurações', icon: Cog,
     items: [
       { id: 'modules',  icon: Component, label: 'App Store', path: '/modules' },
       { id: 'settings', icon: Settings,  label: 'Ajustes',   path: '/settings' },
@@ -100,19 +100,20 @@ function NavGroup({
     <div>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-1.5 mb-0.5 group"
+        className="w-full flex items-center justify-between px-3 py-2 group rounded-md hover:bg-zinc-50 transition-colors"
       >
-        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 group-hover:text-zinc-400 transition-colors">
+        <span className="flex items-center gap-2.5 text-sm font-medium text-zinc-700">
+          <group.icon size={16} className="text-zinc-500" />
           {group.label}
         </span>
         <ChevronDown
-          size={12}
-          className={cn('text-zinc-600 transition-transform duration-200', open && 'rotate-180')}
+          size={13}
+          className={cn('text-zinc-400 transition-transform duration-200', open && 'rotate-180')}
         />
       </button>
 
       {open && (
-        <div className="flex flex-col gap-0.5 mb-3">
+        <div className="flex flex-col mt-0.5 mb-1 ml-7 border-l border-zinc-200">
           {visible.map(item => {
             const isActive = currentPath === item.path;
             return (
@@ -120,20 +121,15 @@ function NavGroup({
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex items-center gap-2 pl-4 pr-3 py-1.5 text-sm transition-all relative',
                   isActive
-                    ? 'bg-zinc-700/60 text-white'
-                    : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                    ? 'text-emerald-600 font-medium'
+                    : 'text-zinc-500 hover:text-zinc-800'
                 )}
               >
-                <item.icon
-                  size={16}
-                  className={cn('shrink-0', isActive ? 'text-emerald-400' : 'text-zinc-500')}
-                />
+                {isActive && <span className="absolute -left-px top-1/2 -translate-y-1/2 w-0.5 h-4 bg-emerald-500 rounded-r" />}
+                <item.icon size={14} className={cn('shrink-0', isActive ? 'text-emerald-500' : 'text-zinc-400')} />
                 {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                )}
               </Link>
             );
           })}
@@ -162,22 +158,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   const sidebar = (
-    <aside className="w-60 bg-zinc-900 flex flex-col shrink-0 h-full">
+    <aside className="w-60 bg-white border-r border-zinc-200 flex flex-col shrink-0 h-full">
       {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-zinc-800 shrink-0">
+      <div className="h-14 flex items-center px-5 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-sm text-white shrink-0">
-            M
+          <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center shrink-0">
+            <Box size={18} className="text-white" strokeWidth={2.5} />
           </div>
-          <div>
-            <p className="font-bold text-sm text-white leading-none">Multiloja</p>
-            <p className="text-[10px] text-zinc-500 leading-none mt-0.5">SaaS</p>
-          </div>
+          <span className="font-bold text-[13px] tracking-[0.18em] text-zinc-800 uppercase">Multiloja</span>
         </div>
       </div>
 
       {/* Nav */}
-      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-1 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 scrollbar-hide">
         {ALL_GROUPS.map((group, i) => (
           <NavGroup
             key={group.label}
@@ -190,91 +183,93 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* User footer */}
-      <div className="px-2 py-3 border-t border-zinc-800 space-y-1">
+      <div className="px-3 py-3 border-t border-zinc-100 space-y-1">
         <button
           onClick={resetTenant}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+          className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-medium text-red-500 hover:bg-red-50 transition-colors"
         >
           <span>Resetar Demo</span>
         </button>
         <button
           onClick={signOut}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
+          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-zinc-50 transition-colors"
         >
-          <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300 shrink-0">
+          <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 shrink-0">
             {user?.full_name?.[0]?.toUpperCase() ?? 'U'}
           </div>
           <div className="flex flex-col text-left overflow-hidden flex-1">
-            <span className="text-sm font-medium text-zinc-300 truncate leading-none">{user?.full_name ?? 'Usuário'}</span>
-            <span className="text-[10px] text-zinc-500 mt-0.5">Sair</span>
+            <span className="text-sm font-medium text-zinc-800 truncate leading-none">{user?.full_name ?? 'Usuário'}</span>
+            <span className="text-[10px] text-zinc-400 mt-0.5">Sair</span>
           </div>
         </button>
       </div>
     </aside>
   );
 
+  // Page title from current path
+  const currentItem = ALL_GROUPS.flatMap(g => g.items).find(i => i.path === location.pathname);
+  const pageTitle = currentItem?.label ?? '';
+
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="flex h-screen bg-white overflow-hidden text-zinc-900 font-sans">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex">{sidebar}</div>
 
       {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setMobileSidebarOpen(false)} />
+          <div className="fixed inset-0 bg-black/40" onClick={() => setMobileSidebarOpen(false)} />
           <div className="relative z-10 flex">{sidebar}</div>
         </div>
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 bg-white">
         {/* Topbar */}
-        <header className="h-14 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-4 px-4 md:px-6 shrink-0">
+        <header className="h-12 bg-white border-b border-zinc-200 flex items-center gap-3 px-5 shrink-0">
           <button
-            className="lg:hidden text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            className="lg:hidden text-zinc-500 hover:text-zinc-900"
             onClick={() => setMobileSidebarOpen(true)}
           >
-            <Menu size={20} />
+            <Menu size={18} />
           </button>
 
-          <div className="hidden md:flex items-center relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={14} />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              className="w-full pl-8 pr-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-transparent dark:border-zinc-700 rounded-lg text-sm focus:border-emerald-500 focus:outline-none transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
-            />
+          <div className="text-sm text-zinc-600">
+            <span className="font-semibold text-zinc-800">{(user as { tenant_name?: string } | null)?.tenant_name ?? 'Multiloja'}</span>
+            {pageTitle && <span className="text-zinc-400"> &nbsp;-&nbsp; {pageTitle}</span>}
           </div>
 
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Theme toggle */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-1 ml-auto">
+            {/* Theme toggle (compact) */}
+            <div className="flex items-center bg-zinc-50 p-0.5 rounded-md border border-zinc-200 mr-1">
               <button
                 onClick={() => setTheme('light')}
-                className={cn('p-1.5 rounded-md text-zinc-500 transition-all', theme === 'light' ? 'bg-white shadow-sm text-yellow-500' : 'hover:text-zinc-900 dark:hover:text-zinc-300')}
-              ><Sun size={13} /></button>
+                className={cn('p-1 rounded text-zinc-500 transition-all', theme === 'light' ? 'bg-white shadow-sm text-amber-500' : 'hover:text-zinc-700')}
+              ><Sun size={12} /></button>
               <button
                 onClick={() => setTheme('system')}
-                className={cn('p-1.5 rounded-md text-zinc-500 transition-all', theme === 'system' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100' : 'hover:text-zinc-900 dark:hover:text-zinc-300')}
-              ><Monitor size={13} /></button>
+                className={cn('p-1 rounded text-zinc-500 transition-all', theme === 'system' ? 'bg-white shadow-sm text-zinc-700' : 'hover:text-zinc-700')}
+              ><Monitor size={12} /></button>
               <button
                 onClick={() => setTheme('dark')}
-                className={cn('p-1.5 rounded-md text-zinc-500 transition-all', theme === 'dark' ? 'bg-zinc-700 shadow-sm text-indigo-400' : 'hover:text-zinc-300')}
-              ><Moon size={13} /></button>
+                className={cn('p-1 rounded text-zinc-500 transition-all', theme === 'dark' ? 'bg-white shadow-sm text-indigo-500' : 'hover:text-zinc-700')}
+              ><Moon size={12} /></button>
             </div>
 
-            <button className="relative text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-2">
-              <Bell size={17} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500" />
+            <button className="relative text-zinc-500 hover:text-zinc-800 p-1.5">
+              <Bell size={16} />
             </button>
 
-            <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-600 dark:text-zinc-300">
-              {user?.full_name?.[0]?.toUpperCase() ?? 'U'}
-            </div>
+            <button className="flex items-center gap-1.5 ml-1 px-1 py-0.5 rounded-md hover:bg-zinc-50 transition-colors">
+              <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
+                {user?.full_name?.[0]?.toUpperCase() ?? 'G'}
+              </div>
+              <ChevronDown size={12} className="text-zinc-400" />
+            </button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex-1 overflow-auto bg-white">
           {children}
         </div>
       </main>

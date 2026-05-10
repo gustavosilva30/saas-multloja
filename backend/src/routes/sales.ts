@@ -104,11 +104,11 @@ router.post(
   [
     body('items').isArray({ min: 1 }),
     body('items.*.product_id').isUUID(),
-    body('items.*.quantity').isFloat({ min: 0.001 }),
-    body('items.*.unit_price').isFloat({ min: 0 }),
+    body('items.*.quantity').isFloat({ min: 0.001, max: 1_000_000 }),
+    body('items.*.unit_price').isFloat({ min: 0, max: 9_999_999.99 }),
     body('customer_id').optional().isUUID(),
     body('payment_method').optional().trim(),
-    body('discount').optional().isFloat({ min: 0 }),
+    body('discount').optional().isFloat({ min: 0, max: 9_999_999.99 }),
   ],
   async (req: Request, res: Response): Promise<void> => {
     try {

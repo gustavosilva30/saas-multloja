@@ -84,8 +84,18 @@ router.get('/groups/:groupId/members', wrap(async (req, res) => {
 
 router.post('/groups/:groupId/members', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const { name, role = 'ADULT', pin_code, avatar_color, avatar_emoji, income_share, phone } = req.body;
-  if (!name) return res.status(400).json({ error: 'name obrigatório' });
+  const ALLOWED_ROLE = ['ADMIN', 'ADULT', 'CHILD'] as const;
+  const name = String(req.body.name || '').trim();
+  if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
+  const role = parseEnum(req.body.role ?? 'ADULT', ALLOWED_ROLE, 'role');
+  const income_share = req.body.income_share == null ? 50 : parseMoney(req.body.income_share, { min: 0, max: 100, field: 'income_share', allowZero: true });
+  const avatar_color = req.body.avatar_color ?? '#10b981';
+  const avatar_emoji = req.body.avatar_emoji ?? '😊';
+  const phone = req.body.phone ?? null;
+  const pin_code = req.body.pin_code;
+  if (pin_code !== undefined && !/^\d{4,6}$/.test(String(pin_code))) {
+    return res.status(400).json({ error: 'pin_code deve ter 4 a 6 dígitos numéricos' });
+  }
 
   let hashedPin: string | null = null;
   if (pin_code) {
@@ -97,7 +107,7 @@ router.post('/groups/:groupId/members', wrap(async (req, res) => {
     `INSERT INTO family_members
        (group_id, tenant_id, name, role, pin_code, avatar_color, avatar_emoji, income_share, phone)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, name, role, avatar_color, avatar_emoji, points, income_share, phone`,
-    [gid(req), tid(req), name, role, hashedPin, avatar_color ?? '#10b981', avatar_emoji ?? '😊', income_share ?? 50, phone ?? null]
+    [gid(req), tid(req), name, role, hashedPin, avatar_color, avatar_emoji, income_share, phone]
   );
   res.status(201).json({ member: r.rows[0] });
 }));
@@ -145,13 +155,10 @@ router.get('/groups/:groupId/expenses', wrap(async (req, res) => {
   }
 
   const r = await query(
-    `SELECT e.*, fm.name AS paid_by_name, fm.avatar_color, fm.avatar_emoji,
-            COALESCE(json_agg(s) FILTER (WHERE s.id IS NOT NULL), '[]') AS splits
+    `SELECT e.*, fm.name AS paid_by_name, fm.avatar_color, fm.avatar_emoji
      FROM family_expenses e
      JOIN family_members fm ON fm.id = e.paid_by_member_id
-     LEFT JOIN family_expense_splits s ON s.expense_id = e.id
      WHERE ${conditions.join(' AND ')}
-     GROUP BY e.id, fm.name, fm.avatar_color, fm.avatar_emoji
      ORDER BY e.expense_date DESC, e.created_at DESC
      LIMIT $${i}`,
     [...params, parseInt(limit)]
@@ -161,14 +168,41 @@ router.get('/groups/:groupId/expenses', wrap(async (req, res) => {
 
 router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const {
-    paid_by_member_id, amount, description,
-    category = 'GENERAL', split_type = 'EQUAL',
-    expense_date, receipt_url, custom_splits,
-  } = req.body;
 
-  if (!paid_by_member_id || !amount || !description) {
-    return res.status(400).json({ error: 'paid_by_member_id, amount e description obrigatórios' });
+  const ALLOWED_CAT = ['FOOD','HOUSING','TRANSPORT','HEALTH','EDUCATION','LEISURE','GENERAL'] as const;
+  const ALLOWED_SPLIT = ['EQUAL','PROPORTIONAL','CUSTOM'] as const;
+
+  const paid_by_member_id = parseUUID(req.body.paid_by_member_id, 'paid_by_member_id');
+  const amount      = parseMoney(req.body.amount, { field: 'amount' });
+  const description = String(req.body.description || '').trim();
+  if (!description) return res.status(400).json({ error: 'description obrigatório' });
+  if (description.length > 255) return res.status(400).json({ error: 'description excede 255 caracteres' });
+
+  const category   = parseEnum(req.body.category   ?? 'GENERAL', ALLOWED_CAT, 'category');
+  const split_type = parseEnum(req.body.split_type ?? 'EQUAL',   ALLOWED_SPLIT, 'split_type');
+  const expense_date = req.body.expense_date || new Date().toISOString().slice(0, 10);
+  const receipt_url  = req.body.receipt_url ?? null;
+  const custom_splits = Array.isArray(req.body.custom_splits) ? req.body.custom_splits : [];
+
+  // 🔒 C2: valida que paid_by_member_id pertence ao grupo + tenant
+  await assertGroupMember(paid_by_member_id, gid(req), tid(req), 'pagador');
+
+  // 🔒 C2: se CUSTOM, valida que todos os member_ids do split pertencem ao grupo
+  let validatedSplits: Array<{ member_id: string; amount: number }> = [];
+  if (split_type === 'CUSTOM') {
+    if (!custom_splits.length) {
+      return res.status(400).json({ error: 'custom_splits obrigatório para split CUSTOM' });
+    }
+    validatedSplits = custom_splits.map((s: any, i: number) => ({
+      member_id: parseUUID(s.member_id, `custom_splits[${i}].member_id`),
+      amount:    parseMoney(s.amount,    { field: `custom_splits[${i}].amount` }),
+    }));
+
+    const sum = validatedSplits.reduce((acc, s) => acc + s.amount, 0);
+    if (Math.abs(sum - amount) > 0.01) {
+      return res.status(400).json({ error: `Soma dos splits (${sum.toFixed(2)}) difere do amount (${amount.toFixed(2)})` });
+    }
+    await assertAllGroupMembers(validatedSplits.map(s => s.member_id), gid(req), tid(req));
   }
 
   let expense: any;
@@ -178,17 +212,15 @@ router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
          (group_id, tenant_id, paid_by_member_id, amount, description, category, split_type, expense_date, receipt_url)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [gid(req), tid(req), paid_by_member_id, amount, description, category, split_type,
-       expense_date ?? new Date().toISOString().slice(0, 10), receipt_url ?? null]
+       expense_date, receipt_url]
     );
     expense = r.rows[0];
 
-    if (split_type === 'CUSTOM' && Array.isArray(custom_splits)) {
-      for (const s of custom_splits) {
-        await client.query(
-          `INSERT INTO family_expense_splits (expense_id, member_id, amount) VALUES ($1,$2,$3)`,
-          [expense.id, s.member_id, s.amount]
-        );
-      }
+    for (const s of validatedSplits) {
+      await client.query(
+        `INSERT INTO family_expense_splits (expense_id, member_id, amount) VALUES ($1,$2,$3)`,
+        [expense.id, s.member_id, s.amount]
+      );
     }
   });
 
@@ -225,19 +257,23 @@ router.get('/groups/:groupId/goals', wrap(async (req, res) => {
 
 router.post('/groups/:groupId/goals', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const { title, description, target_amount, target_date, emoji, color } = req.body;
-  if (!title || !target_amount) return res.status(400).json({ error: 'title e target_amount obrigatórios' });
+  const title = String(req.body.title || '').trim();
+  if (!title || title.length > 150) return res.status(400).json({ error: 'title inválido (1-150 caracteres)' });
+  const target_amount = parseMoney(req.body.target_amount, { field: 'target_amount', max: 99_999_999.99 });
+  const description = req.body.description ?? null;
+  const target_date = req.body.target_date ?? null;
+  const emoji = req.body.emoji ?? '🎯';
+  const color = req.body.color ?? '#10b981';
   const r = await query(
     `INSERT INTO family_goals (group_id, tenant_id, title, description, target_amount, target_date, emoji, color)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [gid(req), tid(req), title, description ?? null, target_amount, target_date ?? null, emoji ?? '🎯', color ?? '#10b981']
+    [gid(req), tid(req), title, description, target_amount, target_date, emoji, color]
   );
   res.status(201).json({ goal: r.rows[0] });
 }));
 
 router.patch('/groups/:groupId/goals/:goalId/contribute', wrap(async (req, res) => {
-  const { amount } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'amount inválido' });
+  const amount = parseMoney(req.body.amount, { field: 'amount' });
   const r = await query(
     `UPDATE family_goals
      SET current_amount = LEAST(current_amount + $1, target_amount),
@@ -284,19 +320,23 @@ router.get('/groups/:groupId/tasks', wrap(async (req, res) => {
 
 router.post('/groups/:groupId/tasks', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const {
-    title, description, assigned_to_member_id, created_by_member_id,
-    points_reward = 10, due_date, recurrent, recurrent_days,
-  } = req.body;
+  const title = String(req.body.title || '').trim();
+  if (!title || title.length > 200) return res.status(400).json({ error: 'title inválido (1-200 caracteres)' });
 
-  if (!title) return res.status(400).json({ error: 'title obrigatório' });
+  const points_reward = parseInteger(req.body.points_reward ?? 10, { min: 1, max: 500, field: 'points_reward' });
+  const recurrent = Boolean(req.body.recurrent);
+  const recurrent_days = recurrent
+    ? parseInteger(req.body.recurrent_days ?? 7, { min: 1, max: 365, field: 'recurrent_days' })
+    : null;
 
-  // Validar que criador é ADMIN ou ADULT
+  const assigned_to_member_id = optionalUUID(req.body.assigned_to_member_id, 'assigned_to_member_id');
+  const created_by_member_id  = optionalUUID(req.body.created_by_member_id,  'created_by_member_id');
+
+  // 🔒 valida cross-group dos membros referenciados
+  if (assigned_to_member_id) await assertGroupMember(assigned_to_member_id, gid(req), tid(req), 'membro atribuído');
   if (created_by_member_id) {
-    const creator = await query(
-      `SELECT role FROM family_members WHERE id = $1 AND group_id = $2 AND is_active = true`,
-      [created_by_member_id, gid(req)]
-    );
+    await assertGroupMember(created_by_member_id, gid(req), tid(req), 'criador');
+    const creator = await query(`SELECT role FROM family_members WHERE id = $1`, [created_by_member_id]);
     if (creator.rows[0]?.role === 'CHILD') {
       return res.status(403).json({ error: 'CHILD não pode criar tarefas' });
     }
@@ -308,7 +348,7 @@ router.post('/groups/:groupId/tasks', wrap(async (req, res) => {
         title, description, points_reward, due_date, recurrent, recurrent_days)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
     [gid(req), tid(req), assigned_to_member_id ?? null, created_by_member_id ?? null,
-     title, description ?? null, points_reward, due_date ?? null, recurrent ?? false, recurrent_days ?? null]
+     title, req.body.description ?? null, points_reward, req.body.due_date ?? null, recurrent, recurrent_days]
   );
   res.status(201).json({ task: r.rows[0] });
 }));

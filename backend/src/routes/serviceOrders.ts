@@ -26,9 +26,9 @@ const itemValidators = [
   body('items.*.product_id').optional({ nullable: true }).isUUID(),
   body('items.*.technician_id').optional({ nullable: true }).isUUID(),
   body('items.*.description').trim().notEmpty(),
-  body('items.*.quantity').isFloat({ gt: 0 }),
-  body('items.*.unit_price').isFloat({ min: 0 }),
-  body('items.*.discount').optional().isFloat({ min: 0 }),
+  body('items.*.quantity').isFloat({ gt: 0, max: 1_000_000 }),
+  body('items.*.unit_price').isFloat({ min: 0, max: 9_999_999.99 }),
+  body('items.*.discount').optional().isFloat({ min: 0, max: 9_999_999.99 }),
 ];
 
 // ── GET / — list ──────────────────────────────────────────────────────────────

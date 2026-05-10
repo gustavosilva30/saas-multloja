@@ -242,10 +242,27 @@ function NewExpenseModal({ groupId, members, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
+  useEffect(() => {
+    if (!form.paid_by_member_id && members.length > 0) {
+      set('paid_by_member_id', members[0].id);
+    }
+  }, [members, form.paid_by_member_id]);
+
   async function save(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true);
-    try { await api('POST', `/api/family/groups/${groupId}/expenses`, { ...form, amount: parseFloat(form.amount) }); onSaved(); }
-    finally { setSaving(false); }
+    e.preventDefault();
+    if (!form.paid_by_member_id) {
+      alert('Selecione quem pagou a despesa');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api('POST', `/api/family/groups/${groupId}/expenses`, form);
+      onSaved();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao salvar despesa');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

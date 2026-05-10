@@ -13,6 +13,8 @@ import {
   importOfxTransactions,
   TransactionInput,
 } from '../services/FinanceService';
+import { parseMoney, parseInteger, parseEnum, parseISODate, parseUUID, optionalUUID } from '../utils/validators';
+import { assertTenantOwnership } from '../utils/tenantOwnership';
 
 const router = Router();
 router.use(authenticateToken, tenantIsolation);
@@ -32,18 +34,33 @@ router.get('/bank-accounts', wrap(async (req, res) => {
 }));
 
 router.post('/bank-accounts', wrap(async (req, res) => {
-  const { name, type = 'CHECKING', color = '#10b981', bank_name, description, initial_balance = 0 } = req.body;
-  if (!name) return res.status(400).json({ error: 'name obrigatório' });
+  const ALLOWED = ['CHECKING','SAVINGS','CASH','INVESTMENT'] as const;
+  const name = String(req.body.name || '').trim();
+  if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
+  const type  = parseEnum(req.body.type ?? 'CHECKING', ALLOWED, 'type');
+  const color = req.body.color ?? '#10b981';
+  // initial_balance pode ser negativo (overdraft)
+  const initial_balance = req.body.initial_balance == null
+    ? 0
+    : parseMoney(req.body.initial_balance, { min: -9_999_999.99, max: 99_999_999.99, field: 'initial_balance', allowZero: true });
   const r = await query(
     `INSERT INTO bank_accounts (tenant_id, name, type, color, bank_name, description, initial_balance)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [tid(req), name, type, color, bank_name ?? null, description ?? null, initial_balance]
+    [tid(req), name, type, color, req.body.bank_name ?? null, req.body.description ?? null, initial_balance]
   );
   res.status(201).json({ account: r.rows[0] });
 }));
 
 router.put('/bank-accounts/:id', wrap(async (req, res) => {
-  const { name, type, color, bank_name, description, initial_balance } = req.body;
+  const ALLOWED = ['CHECKING','SAVINGS','CASH','INVESTMENT'] as const;
+  const { name, color, bank_name, description } = req.body;
+  const type = req.body.type ? parseEnum(req.body.type, ALLOWED, 'type') : undefined;
+  const initial_balance = req.body.initial_balance == null
+    ? undefined
+    : parseMoney(req.body.initial_balance, { min: -9_999_999.99, max: 99_999_999.99, field: 'initial_balance', allowZero: true });
+  if (name !== undefined && (!String(name).trim() || String(name).length > 100)) {
+    return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
+  }
   const r = await query(
     `UPDATE bank_accounts SET
        name            = COALESCE($1, name),
@@ -186,10 +203,44 @@ router.get('/transactions', wrap(async (req, res) => {
 }));
 
 router.post('/transactions', wrap(async (req, res) => {
-  const data: TransactionInput = req.body;
-  if (!data.type || !data.description || !data.amount || !data.due_date) {
-    return res.status(400).json({ error: 'type, description, amount e due_date obrigatórios' });
-  }
+  const ALLOWED_TYPE   = ['income', 'expense'] as const;
+  const ALLOWED_STATUS = ['pending', 'paid', 'cancelled'] as const;
+
+  const type        = parseEnum(req.body.type, ALLOWED_TYPE, 'type');
+  const description = String(req.body.description || '').trim();
+  if (!description) return res.status(400).json({ error: 'description obrigatório' });
+  if (description.length > 255) return res.status(400).json({ error: 'description excede 255 caracteres' });
+
+  const amount   = parseMoney(req.body.amount,   { field: 'amount' });
+  const due_date = parseISODate(req.body.due_date, 'due_date');
+  const status   = req.body.status ? parseEnum(req.body.status, ALLOWED_STATUS, 'status') : 'pending';
+  const installments = parseInteger(req.body.installments ?? 1, { min: 1, max: 60, field: 'installments' });
+  const recurrent = Boolean(req.body.recurrent);
+  const recurrent_months = recurrent
+    ? parseInteger(req.body.recurrent_months ?? 12, { min: 1, max: 60, field: 'recurrent_months' })
+    : undefined;
+
+  const bank_account_id     = optionalUUID(req.body.bank_account_id,     'bank_account_id');
+  const chart_of_account_id = optionalUUID(req.body.chart_of_account_id, 'chart_of_account_id');
+  const cost_center_id      = optionalUUID(req.body.cost_center_id,      'cost_center_id');
+  const contact_id          = optionalUUID(req.body.contact_id,          'contact_id');
+
+  // 🔒 C3: valida que cada FK pertence ao tenant
+  if (bank_account_id)     await assertTenantOwnership('bank_accounts',    bank_account_id,     tid(req), 'bank_account', 'AND is_active = true');
+  if (chart_of_account_id) await assertTenantOwnership('chart_of_accounts', chart_of_account_id, tid(req), 'chart_of_account');
+  if (cost_center_id)      await assertTenantOwnership('cost_centers',      cost_center_id,      tid(req), 'cost_center');
+  if (contact_id)          await assertTenantOwnership('customers',         contact_id,          tid(req), 'contact');
+
+  const data: TransactionInput = {
+    type, description, amount, due_date, status,
+    installments, recurrent, recurrent_months,
+    bank_account_id, chart_of_account_id, cost_center_id, contact_id,
+    competence_date: req.body.competence_date,
+    payment_date:    req.body.payment_date,
+    tags:    Array.isArray(req.body.tags) ? req.body.tags.slice(0, 20).map(String) : [],
+    category: req.body.category,
+  };
+
   const created = await createTransaction(tid(req), data);
   res.status(201).json({ transactions: created, count: created.length });
 }));
@@ -208,6 +259,36 @@ router.get('/transactions/:id', wrap(async (req, res) => {
 }));
 
 router.put('/transactions/:id', wrap(async (req, res) => {
+  // 🔒 C3: cada FK editável precisa ser validada cross-tenant antes do UPDATE
+  const fkChecks: Array<[string, string, string, string?]> = [
+    ['bank_account_id',     'bank_accounts',    'bank_account',     'AND is_active = true'],
+    ['chart_of_account_id', 'chart_of_accounts','chart_of_account'],
+    ['cost_center_id',      'cost_centers',     'cost_center'],
+    ['contact_id',          'customers',        'contact'],
+  ];
+  for (const [field, table, label, extra] of fkChecks) {
+    if (req.body[field] !== undefined && req.body[field] !== null) {
+      const id = parseUUID(req.body[field], field);
+      await assertTenantOwnership(table, id, tid(req), label, extra ?? '');
+      req.body[field] = id;
+    }
+  }
+
+  // Validações monetárias e de tipo
+  if (req.body.amount !== undefined) req.body.amount = parseMoney(req.body.amount, { field: 'amount' });
+  if (req.body.due_date !== undefined) req.body.due_date = parseISODate(req.body.due_date, 'due_date');
+  if (req.body.competence_date !== undefined && req.body.competence_date !== null) {
+    req.body.competence_date = parseISODate(req.body.competence_date, 'competence_date');
+  }
+  if (req.body.description !== undefined) {
+    const d = String(req.body.description).trim();
+    if (!d || d.length > 255) return res.status(400).json({ error: 'description inválido' });
+    req.body.description = d;
+  }
+  if (req.body.tags !== undefined && !Array.isArray(req.body.tags)) {
+    return res.status(400).json({ error: 'tags deve ser array' });
+  }
+
   const allowed = ['description', 'amount', 'due_date', 'competence_date',
                    'bank_account_id', 'chart_of_account_id', 'cost_center_id',
                    'contact_id', 'tags', 'category', 'attachment_url'];
@@ -242,8 +323,14 @@ router.delete('/transactions/:id', wrap(async (req, res) => {
 }));
 
 router.patch('/transactions/:id/pay', wrap(async (req, res) => {
-  const { payment_date, bank_account_id } = req.body;
-  if (!payment_date) return res.status(400).json({ error: 'payment_date obrigatório' });
+  const payment_date   = parseISODate(req.body.payment_date, 'payment_date');
+  const bank_account_id = optionalUUID(req.body.bank_account_id, 'bank_account_id');
+
+  // 🔒 C3: valida que a conta bancária pertence ao tenant antes de gravá-la
+  if (bank_account_id) {
+    await assertTenantOwnership('bank_accounts', bank_account_id, tid(req), 'bank_account', 'AND is_active = true');
+  }
+
   const tx = await payTransaction(req.params.id, tid(req), payment_date, bank_account_id);
   res.json({ transaction: tx });
 }));
@@ -251,14 +338,15 @@ router.patch('/transactions/:id/pay', wrap(async (req, res) => {
 // ── Reports ───────────────────────────────────────────────────────────────────
 
 router.get('/reports/dre', wrap(async (req, res) => {
-  const { start_date, end_date } = req.query as Record<string, string>;
-  if (!start_date || !end_date) return res.status(400).json({ error: 'start_date e end_date obrigatórios' });
+  const start_date = parseISODate(req.query.start_date, 'start_date');
+  const end_date   = parseISODate(req.query.end_date,   'end_date');
   const dre = await getDRE(tid(req), start_date, end_date);
   res.json(dre);
 }));
 
 router.get('/reports/cash-flow', wrap(async (req, res) => {
-  const months = parseInt((req.query.months as string) || '12');
+  const raw = parseInt((req.query.months as string) || '12', 10) || 12;
+  const months = Math.min(60, Math.max(1, raw));
   const rows = await getCashFlow(tid(req), months);
   res.json({ cash_flow: rows });
 }));

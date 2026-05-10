@@ -272,7 +272,6 @@ export async function withTransaction<T>(
     throw error;
   } finally {
     client.release();
-    await migrationPool.end();
   }
 }
 

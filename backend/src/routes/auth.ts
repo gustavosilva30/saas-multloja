@@ -98,6 +98,9 @@ router.post(
         );
         const tenantId = tenantRes.rows[0].id;
 
+        // Ativa o contexto para permitir a inserção do usuário (RLS)
+        await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenantId]);
+
         const userRes = await client.query(
           `INSERT INTO user_profiles
              (email, password_hash, full_name, role, tenant_id, is_active, created_at, updated_at)
@@ -152,18 +155,21 @@ router.post(
       const valid = await bcrypt.compare(password, user.password_hash);
       if (!valid)         { res.status(401).json({ error: 'Invalid credentials' }); return; }
 
-      await query('UPDATE user_profiles SET last_login_at = NOW() WHERE id = $1', [user.id]);
+      // Ativa o contexto do tenant para as próximas operações (update last_login e logs)
+      await tenantContext.run({ tenantId: user.tenant_id }, async () => {
+        await query('UPDATE user_profiles SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
-      const access  = signAccess({  userId: user.id, email: user.email, role: user.role, tenantId: user.tenant_id });
-      const refresh = signRefresh({ userId: user.id, tokenVersion: user.token_version });
-      setRefreshCookie(res, refresh);
+        const access  = signAccess({  userId: user.id, email: user.email, role: user.role, tenantId: user.tenant_id });
+        const refresh = signRefresh({ userId: user.id, tokenVersion: user.token_version });
+        setRefreshCookie(res, refresh);
 
-      res.json({
-        token: access,
-        user: {
-          id: user.id, email: user.email, full_name: user.full_name,
-          role: user.role, tenant_id: user.tenant_id,
-        },
+        res.json({
+          token: access,
+          user: {
+            id: user.id, email: user.email, full_name: user.full_name,
+            role: user.role, tenant_id: user.tenant_id,
+          },
+        });
       });
     } catch (err) {
       console.error('Login error:', err);

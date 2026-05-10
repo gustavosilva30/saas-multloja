@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useRef, type FormEvent, type ChangeEv
 import {
   Search, Plus, Package, X, RefreshCw, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, Upload, Image as ImageIcon,
-  ChevronLeft, ChevronRight, Filter, LayoutGrid, List as ListIcon,
+  ChevronLeft, ChevronRight, Filter, LayoutGrid, List as ListIcon, Wand2,
 } from 'lucide-react';
 import { uploadApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { AdvancedImageEditor } from '../components/AdvancedImageEditor';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 const token = () => localStorage.getItem('auth_token') || '';
@@ -312,6 +313,7 @@ function ProductDrawer({
   const isLastStep = stepIdx === steps.length - 1;
   const [nextSku, setNextSku] = useState<string>('');
   const [imageLightbox, setImageLightbox] = useState(false);
+  const [editingImageIdx, setEditingImageIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Fetch next sequential SKU when creating a new product
@@ -323,7 +325,7 @@ function ProductDrawer({
   }, [product]);
   const [error, setError] = useState('');
   const [images, setImages] = useState<{ id?: string; image_url: string; is_primary?: boolean }[]>(
-    product?.images || (product?.image_url ? [{ image_url: product.image_url, is_primary: true }] : [])
+    (product as any)?.images || (product?.image_url ? [{ image_url: product.image_url, is_primary: true }] : [])
   );
   const [uploadingImages, setUploadingImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -538,6 +540,15 @@ function ProductDrawer({
                           <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">
                             PRINCIPAL
                           </div>
+                          {/* Botão editar no preview principal */}
+                          <button
+                            type="button"
+                            onClick={() => setEditingImageIdx(images.findIndex(i => i.is_primary) ?? 0)}
+                            className="absolute bottom-1.5 right-1.5 flex items-center gap-1 px-2 py-1 bg-black/60 hover:bg-black/80 text-white rounded text-[10px] font-medium transition-colors"
+                            title="Abrir editor"
+                          >
+                            <Wand2 size={10} /> Editar
+                          </button>
                         </>
                       ) : (
                         <div className="flex flex-col items-center gap-1.5 text-zinc-400 px-3 text-center">
@@ -565,13 +576,25 @@ function ProductDrawer({
                           title={img.is_primary ? 'Imagem principal' : 'Definir como principal'}
                         >
                           <img src={img.image_url} alt="" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); removeImage(index); }}
-                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          >
-                            <X size={12} className="text-white" />
-                          </button>
+                          {/* Hover overlay: editar ou remover */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); setEditingImageIdx(index); }}
+                              title="Editar imagem"
+                              className="p-0.5 hover:text-emerald-400 text-white"
+                            >
+                              <Wand2 size={11} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); removeImage(index); }}
+                              title="Remover"
+                              className="p-0.5 hover:text-red-400 text-white"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                       {images.length < 10 && (
@@ -729,6 +752,27 @@ function ProductDrawer({
             onClose={() => setImageLightbox(false)}
           />
         )}
+
+        {/* Editor avançado de imagem */}
+        {editingImageIdx !== null && images[editingImageIdx] && (
+          <AdvancedImageEditor
+            src={images[editingImageIdx].image_url}
+            filename={`${form.name || 'produto'}-img${editingImageIdx + 1}.jpg`}
+            onClose={() => setEditingImageIdx(null)}
+            onImageProcessed={async (file) => {
+              try {
+                const result = await uploadApi.upload(file);
+                setImages(prev => prev.map((img, i) =>
+                  i === editingImageIdx ? { ...img, image_url: result.url } : img
+                ));
+              } catch {
+                /* erro de upload já tratado pela UI do editor */
+              } finally {
+                setEditingImageIdx(null);
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -856,7 +900,7 @@ export function Stock() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);

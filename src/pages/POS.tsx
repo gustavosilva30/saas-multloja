@@ -159,7 +159,7 @@ export function POS() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successTotal, setSuccessTotal] = useState<number | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   // Debounce search

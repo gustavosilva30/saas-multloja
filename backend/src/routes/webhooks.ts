@@ -1,7 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/database';
+import { config } from '../config';
 
 const router = Router();
+
+// Valida o token de autenticação enviado pelo Asaas no header
+function validateAsaasToken(req: Request, res: Response): boolean {
+  if (!config.ASAAS_WEBHOOK_TOKEN) return true; // sem token configurado, aceita (dev)
+
+  const incoming = req.headers['asaas-access-token'] as string | undefined;
+  if (!incoming || incoming !== config.ASAAS_WEBHOOK_TOKEN) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
 
 // Tipos dos eventos do Asaas
 interface AsaasWebhookPayload {
@@ -33,6 +46,9 @@ interface AsaasWebhookPayload {
  *   PAYMENT_DELETED    → cobrança cancelada
  */
 router.post('/asaas', async (req: Request, res: Response): Promise<void> => {
+  // Validar token antes de qualquer coisa
+  if (!validateAsaasToken(req, res)) return;
+
   // Responder 200 imediatamente para o Asaas não retentar
   res.status(200).json({ received: true });
 

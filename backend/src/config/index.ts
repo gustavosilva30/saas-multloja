@@ -45,6 +45,7 @@ export const config = {
   // Asaas — gateway de pagamento
   ASAAS_API_KEY: optional('ASAAS_API_KEY', ''),
   ASAAS_API_URL: optional('ASAAS_API_URL', 'https://sandbox.asaas.com'),
+  ASAAS_WEBHOOK_TOKEN: optional('ASAAS_WEBHOOK_TOKEN', ''),
 };
 
 export default config;

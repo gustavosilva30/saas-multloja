@@ -136,6 +136,46 @@ router.post('/tenants/:id/toggle', adminAuth, async (req: Request, res: Response
   }
 });
 
+// ── GET /api/admin/modules ────────────────────────────────────────────────────
+router.get('/modules', adminAuth, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(
+      'SELECT module_id, name, description, category, price, is_free, is_active, sort_order FROM module_catalog ORDER BY sort_order',
+    );
+    res.json({ modules: result.rows });
+  } catch (err) {
+    console.error('Admin modules error:', err);
+    res.status(500).json({ error: 'Failed to list modules' });
+  }
+});
+
+// ── PUT /api/admin/modules/:moduleId ─────────────────────────────────────────
+router.put('/modules/:moduleId', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { moduleId } = req.params;
+    const { price, is_free, is_active, name, description } = req.body;
+
+    const result = await query(`
+      UPDATE module_catalog
+      SET
+        price       = COALESCE($1, price),
+        is_free     = COALESCE($2, is_free),
+        is_active   = COALESCE($3, is_active),
+        name        = COALESCE($4, name),
+        description = COALESCE($5, description),
+        updated_at  = NOW()
+      WHERE module_id = $6
+      RETURNING module_id, name, price, is_free, is_active
+    `, [price ?? null, is_free ?? null, is_active ?? null, name ?? null, description ?? null, moduleId]);
+
+    if (!result.rows[0]) { res.status(404).json({ error: 'Module not found' }); return; }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Admin update module error:', err);
+    res.status(500).json({ error: 'Failed to update module' });
+  }
+});
+
 // ── POST /api/admin/seed ──────────────────────────────────────────────────────
 router.post('/seed',
   [body('email').isEmail(), body('password').isLength({ min: 8 }), body('full_name').notEmpty()],

@@ -1,5 +1,5 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X } from 'lucide-react';
+import { useState, useEffect, FormEvent, MouseEvent } from 'react';
+import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X, Tag, Save, Loader2 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
@@ -150,9 +150,130 @@ function TenantModal({ detail, onClose }: { detail: TenantDetail; onClose: () =>
   );
 }
 
+// ── Module Pricing Tab ────────────────────────────────────────────────────────
+
+interface CatalogMod { module_id: string; name: string; description: string; category: string; price: string; is_free: boolean; is_active: boolean; }
+
+function ModulePricing({ token }: { token: string }) {
+  const [modules, setModules] = useState<CatalogMod[]>([]);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Record<string, { price: string; is_free: boolean; is_active: boolean }>>({});
+
+  useEffect(() => {
+    adminFetch<{ modules: CatalogMod[] }>('/modules', token)
+      .then(d => setModules(d.modules))
+      .catch(() => {});
+  }, [token]);
+
+  const edit = (id: string, field: string, value: unknown) => {
+    setEdits(prev => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value },
+    }));
+  };
+
+  const get = (mod: CatalogMod, field: 'price' | 'is_free' | 'is_active') => {
+    const e = edits[mod.module_id];
+    if (e && field in e) return e[field as keyof typeof e];
+    return mod[field];
+  };
+
+  const save = async (mod: CatalogMod) => {
+    const e = edits[mod.module_id];
+    if (!e) return;
+    setSaving(mod.module_id);
+    try {
+      await adminFetch(`/modules/${mod.module_id}`, token, {
+        method: 'PUT',
+        body: JSON.stringify({
+          price: e.price !== undefined ? Number(e.price) : undefined,
+          is_free: e.is_free,
+          is_active: e.is_active,
+        }),
+      });
+      setModules(prev => prev.map(m => m.module_id === mod.module_id ? { ...m, ...e, price: e.price } : m));
+      setEdits(prev => { const n = { ...prev }; delete n[mod.module_id]; return n; });
+    } catch { alert('Erro ao salvar'); }
+    setSaving(null);
+  };
+
+  const byCategory = modules.reduce<Record<string, CatalogMod[]>>((acc, m) => {
+    (acc[m.category] = acc[m.category] || []).push(m);
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {(Object.entries(byCategory) as [string, CatalogMod[]][]).map(([cat, mods]) => (
+        <div key={cat} className="bg-gray-900 rounded-2xl border border-gray-800">
+          <div className="px-6 py-3 border-b border-gray-800">
+            <h3 className="text-sm font-semibold text-gray-300">{cat}</h3>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {mods.map(mod => {
+              const isDirty = !!edits[mod.module_id];
+              return (
+                <div key={mod.module_id} className="flex items-center gap-4 px-6 py-3 flex-wrap">
+                  <div className="flex-1 min-w-[160px]">
+                    <p className="text-sm font-medium text-white">{mod.name}</p>
+                    <p className="text-xs text-gray-500">{mod.module_id}</p>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={get(mod, 'is_free') as boolean}
+                      onChange={e => edit(mod.module_id, 'is_free', e.target.checked)}
+                      className="accent-emerald-500"
+                    />
+                    Gratuito
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={get(mod, 'is_active') as boolean}
+                      onChange={e => edit(mod.module_id, 'is_active', e.target.checked)}
+                      className="accent-violet-500"
+                    />
+                    Visível
+                  </label>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-500 text-sm">R$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      disabled={get(mod, 'is_free') as boolean}
+                      value={get(mod, 'price') as string}
+                      onChange={e => edit(mod.module_id, 'price', e.target.value)}
+                      className="w-20 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:border-violet-500 disabled:opacity-40"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => save(mod)}
+                    disabled={!isDirty || saving === mod.module_id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-700 disabled:opacity-30 text-white transition-colors"
+                  >
+                    {saving === mod.module_id ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    Salvar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const [tab, setTab] = useState<'tenants' | 'modules'>('tenants');
   const [stats, setStats] = useState<Stats | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [selected, setSelected] = useState<TenantDetail | null>(null);
@@ -178,7 +299,7 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
     setSelected(detail);
   };
 
-  const toggleTenant = async (id: string, e: React.MouseEvent) => {
+  const toggleTenant = async (id: string, e: MouseEvent) => {
     e.stopPropagation();
     await adminFetch(`/tenants/${id}/toggle`, token, { method: 'POST' });
     load();
@@ -201,6 +322,25 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+        {/* Tabs */}
+        <div className="flex gap-2 border-b border-gray-800 pb-0">
+          <button
+            onClick={() => setTab('tenants')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'tenants' ? 'bg-gray-900 text-white border border-b-0 border-gray-800' : 'text-gray-400 hover:text-white'}`}
+          >
+            <Building2 size={15} /> Empresas
+          </button>
+          <button
+            onClick={() => setTab('modules')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'modules' ? 'bg-gray-900 text-white border border-b-0 border-gray-800' : 'text-gray-400 hover:text-white'}`}
+          >
+            <Tag size={15} /> Preços dos Módulos
+          </button>
+        </div>
+
+        {tab === 'modules' && <ModulePricing token={token} />}
+
+        {tab === 'tenants' && <>
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -267,6 +407,7 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
             </div>
           )}
         </div>
+        </>}
       </main>
 
       {selected && <TenantModal detail={selected} onClose={() => setSelected(null)} />}

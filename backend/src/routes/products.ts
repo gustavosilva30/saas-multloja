@@ -357,4 +357,79 @@ router.patch(
   }
 );
 
+// ── Categories ────────────────────────────────────────────────────────────────
+
+// List categories
+router.get('/categories/all', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(
+      `SELECT c.*, COUNT(p.id)::int AS product_count
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id AND p.tenant_id = c.tenant_id AND p.is_active = true
+       WHERE c.tenant_id = $1
+       GROUP BY c.id
+       ORDER BY c.name`,
+      [req.user!.tenant_id]
+    );
+    res.json({ categories: result.rows });
+  } catch (err) {
+    console.error('List categories error:', err);
+    res.status(500).json({ error: 'Failed to list categories' });
+  }
+});
+
+// Create category
+router.post('/categories',
+  authorize('owner', 'admin', 'operator'),
+  [body('name').trim().isLength({ min: 1 })],
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
+
+      const { name, description, color } = req.body;
+      const result = await query(
+        `INSERT INTO categories (tenant_id, name, description, color)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [req.user!.tenant_id, name, description ?? '', color ?? '#6366f1']
+      );
+      res.status(201).json({ category: result.rows[0] });
+    } catch (err: any) {
+      if (err.code === '23505') { res.status(409).json({ error: 'Category already exists' }); return; }
+      console.error('Create category error:', err);
+      res.status(500).json({ error: 'Failed to create category' });
+    }
+  }
+);
+
+// Delete category
+router.delete('/categories/:id', authorize('owner', 'admin'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    await query('DELETE FROM categories WHERE id = $1 AND tenant_id = $2', [req.params.id, req.user!.tenant_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete category error:', err);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
+// Stock stats
+router.get('/stats/summary', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(`
+      SELECT
+        COUNT(*)::int                                          AS total_products,
+        COUNT(*) FILTER (WHERE stock_quantity = 0)::int       AS out_of_stock,
+        COUNT(*) FILTER (WHERE stock_quantity > 0 AND stock_quantity <= min_stock)::int AS low_stock,
+        COALESCE(SUM(stock_quantity * cost_price), 0)::numeric AS stock_value
+      FROM products
+      WHERE tenant_id = $1 AND is_active = true
+    `, [req.user!.tenant_id]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Failed to get stats' });
+  }
+});
+
 export default router;

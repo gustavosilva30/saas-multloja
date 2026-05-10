@@ -58,26 +58,26 @@ function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-950 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-violet-600 mb-4">
             <span className="text-white font-bold text-xl">S</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Super Admin</h1>
-          <p className="text-gray-400 text-sm mt-1">Painel da Plataforma NexusERP</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Super Admin</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Painel da Plataforma NexusERP</p>
         </div>
-        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 space-y-4 border border-gray-800">
-          {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>}
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-2xl p-6 space-y-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+          {error && <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-sm rounded-lg px-4 py-3">{error}</div>}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">E-mail</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">E-mail</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="admin@gsntech.com.br"
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500" />
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Senha</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Senha</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500" />
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500" />
           </div>
           <button type="submit" disabled={loading}
             className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors">
@@ -97,25 +97,25 @@ function TenantModal({ detail, onClose }: { detail: TenantDetail; onClose: () =>
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-gray-900 rounded-2xl border border-gray-800 w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
           <div>
-            <h2 className="text-lg font-bold text-white">{tenant.name}</h2>
-            <p className="text-sm text-gray-400">{NICHES[tenant.niche] || tenant.niche} · {tenant.subscription_tier}</p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">{tenant.name}</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{NICHES[tenant.niche] || tenant.niche} · {tenant.subscription_tier}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20} /></button>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"><X size={20} /></button>
         </div>
 
         <div className="p-6 space-y-6">
           {/* Módulos ativos */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-3">Módulos Ativos ({activeModules.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Módulos Ativos ({activeModules.length})</h3>
             {activeModules.length === 0 ? (
               <p className="text-sm text-gray-500">Nenhum módulo ativado ainda</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {activeModules.map(m => (
-                  <span key={m} className="bg-violet-500/20 text-violet-300 text-xs px-3 py-1 rounded-full border border-violet-500/30">
+                  <span key={m} className="bg-violet-500/20 text-violet-700 dark:text-violet-300 text-xs px-3 py-1 rounded-full border border-violet-500/30">
                     {MODULES[m] || m}
                   </span>
                 ))}
@@ -125,19 +125,19 @@ function TenantModal({ detail, onClose }: { detail: TenantDetail; onClose: () =>
 
           {/* Usuários */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-300 mb-3">Usuários ({users.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Usuários ({users.length})</h3>
             <div className="space-y-2">
               {users.map(u => (
-                <div key={u.id} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2.5">
+                <div key={u.id} className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2.5">
                   <div>
-                    <p className="text-sm font-medium text-white">{u.full_name}</p>
-                    <p className="text-xs text-gray-400">{u.email}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{u.full_name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{u.email}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      u.role === 'owner' ? 'bg-amber-500/20 text-amber-300' :
-                      u.role === 'admin' ? 'bg-blue-500/20 text-blue-300' :
-                      'bg-gray-700 text-gray-400'
+                      u.role === 'owner' ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' :
+                      u.role === 'admin' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300' :
+                      'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
                     }`}>{u.role}</span>
                     <span className={`w-2 h-2 rounded-full ${u.is_active ? 'bg-emerald-400' : 'bg-red-400'}`} />
                   </div>
@@ -206,21 +206,21 @@ function ModulePricing({ token }: { token: string }) {
   return (
     <div className="space-y-6">
       {(Object.entries(byCategory) as [string, CatalogMod[]][]).map(([cat, mods]) => (
-        <div key={cat} className="bg-gray-900 rounded-2xl border border-gray-800">
-          <div className="px-6 py-3 border-b border-gray-800">
-            <h3 className="text-sm font-semibold text-gray-300">{cat}</h3>
+        <div key={cat} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{cat}</h3>
           </div>
-          <div className="divide-y divide-gray-800">
+          <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {mods.map(mod => {
               const isDirty = !!edits[mod.module_id];
               return (
                 <div key={mod.module_id} className="flex items-center gap-4 px-6 py-3 flex-wrap">
                   <div className="flex-1 min-w-[160px]">
-                    <p className="text-sm font-medium text-white">{mod.name}</p>
-                    <p className="text-xs text-gray-500">{mod.module_id}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{mod.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500">{mod.module_id}</p>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={get(mod, 'is_free') as boolean}
@@ -230,7 +230,7 @@ function ModulePricing({ token }: { token: string }) {
                     Gratuito
                   </label>
 
-                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={get(mod, 'is_active') as boolean}
@@ -241,7 +241,7 @@ function ModulePricing({ token }: { token: string }) {
                   </label>
 
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-500 text-sm">R$</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">R$</span>
                     <input
                       type="number"
                       step="0.01"
@@ -249,7 +249,7 @@ function ModulePricing({ token }: { token: string }) {
                       disabled={get(mod, 'is_free') as boolean}
                       value={get(mod, 'price') as string}
                       onChange={e => edit(mod.module_id, 'price', e.target.value)}
-                      className="w-20 bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:border-violet-500 disabled:opacity-40"
+                      className="w-20 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:border-violet-500 disabled:opacity-40"
                     />
                   </div>
 
@@ -327,9 +327,9 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-white">
       {/* Header */}
-      <header className="bg-gray-900 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center font-bold text-sm">S</div>
           <div>
@@ -370,16 +370,16 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {/* Tabs */}
-        <div className="flex gap-2 border-b border-gray-800 pb-0">
+        <div className="flex gap-2 border-b border-gray-300 dark:border-gray-800 pb-0">
           <button
             onClick={() => setTab('tenants')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'tenants' ? 'bg-gray-900 text-white border border-b-0 border-gray-800' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'tenants' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-b-0 border-gray-300 dark:border-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
           >
             <Building2 size={15} /> Empresas
           </button>
           <button
             onClick={() => setTab('modules')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'modules' ? 'bg-gray-900 text-white border border-b-0 border-gray-800' : 'text-gray-400 hover:text-white'}`}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'modules' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-b-0 border-gray-300 dark:border-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
           >
             <Tag size={15} /> Preços dos Módulos
           </button>
@@ -397,54 +397,54 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
               { label: 'Novas (30 dias)', value: stats.new_tenants_30d, icon: TrendingUp, color: 'emerald' },
               { label: 'Usuários ativos (7d)', value: stats.active_users_7d, icon: Package, color: 'amber' },
             ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-                <div className={`w-9 h-9 rounded-lg bg-${color}-500/20 flex items-center justify-center mb-3`}>
-                  <Icon size={18} className={`text-${color}-400`} />
+              <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
+                <div className={`w-9 h-9 rounded-lg bg-${color}-100 dark:bg-${color}-500/20 flex items-center justify-center mb-3`}>
+                  <Icon size={18} className={`text-${color}-600 dark:text-${color}-400`} />
                 </div>
-                <p className="text-2xl font-bold">{value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
               </div>
             ))}
           </div>
         )}
 
         {/* Tenant list */}
-        <div className="bg-gray-900 rounded-2xl border border-gray-800">
-          <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="font-semibold">Empresas cadastradas</h2>
-            <span className="text-sm text-gray-400">{tenants.length} total</span>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Empresas cadastradas</h2>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{tenants.length} total</span>
           </div>
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <div className="divide-y divide-gray-800">
+            <div className="divide-y divide-gray-200 dark:divide-gray-800">
               {tenants.map(t => (
                 <div key={t.id} onClick={() => openTenant(t.id)}
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-gray-800/50 cursor-pointer transition-colors">
-                  <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center font-bold text-violet-300 shrink-0">
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-gray-100 dark:hover:bg-gray-800/50 cursor-pointer transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-500/20 flex items-center justify-center font-bold text-violet-600 dark:text-violet-300 shrink-0">
                     {t.name[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{t.name}</p>
-                      {!t.is_active && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Desativada</span>}
+                      <p className="font-medium truncate text-gray-900 dark:text-white">{t.name}</p>
+                      {!t.is_active && <span className="text-xs bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Desativada</span>}
                     </div>
-                    <p className="text-xs text-gray-400">{NICHES[t.niche] || t.niche} · {t.user_count} usuário{t.user_count !== 1 ? 's' : ''} · {t.active_module_count} módulo{t.active_module_count !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{NICHES[t.niche] || t.niche} · {t.user_count} usuário{t.user_count !== 1 ? 's' : ''} · {t.active_module_count} módulo{t.active_module_count !== 1 ? 's' : ''}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      t.subscription_tier === 'premium' ? 'bg-amber-500/20 text-amber-300' : 'bg-gray-700 text-gray-400'
+                      t.subscription_tier === 'premium' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
                     }`}>{t.subscription_tier}</span>
                     <button
                       onClick={e => toggleTenant(t.id, e)}
-                      className={`transition-colors ${t.is_active ? 'text-emerald-400 hover:text-red-400' : 'text-red-400 hover:text-emerald-400'}`}
+                      className={`transition-colors ${t.is_active ? 'text-emerald-600 dark:text-emerald-400 hover:text-red-500 dark:hover:text-red-400' : 'text-red-500 dark:text-red-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}
                       title={t.is_active ? 'Desativar empresa' : 'Ativar empresa'}
                     >
                       {t.is_active ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
                     </button>
-                    <ChevronRight size={16} className="text-gray-500" />
+                    <ChevronRight size={16} className="text-gray-400 dark:text-gray-500" />
                   </div>
                 </div>
               ))}

@@ -4,16 +4,47 @@ function getToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
+let isRefreshing = false;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    credentials: 'include', // Send cookies (Refresh Token)
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
+
+  // Se o token expirou (401) e não estamos na rota de login ou na própria rota de refresh
+  if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh') && !isRefreshing) {
+    isRefreshing = true;
+    try {
+      const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (refreshRes.ok) {
+        const { token: newToken } = await refreshRes.json();
+        localStorage.setItem('auth_token', newToken);
+        isRefreshing = false;
+        // Retry original request
+        return request<T>(path, options);
+      }
+    } catch (err) {
+      // Refresh failed
+    } finally {
+      isRefreshing = false;
+    }
+
+    // Se falhou o refresh, limpa e redireciona (ou deixa o context tratar)
+    localStorage.removeItem('auth_token');
+    window.location.href = '/login';
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
 
   const data = await res.json().catch(() => ({}));
 
@@ -70,6 +101,10 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
+  logout: () =>
+    request('/api/auth/logout', {
+      method: 'POST',
+    }),
 };
 
 // ─── Produtos ─────────────────────────────────────────────────
@@ -121,6 +156,7 @@ export const uploadApi = {
     form.append('file', file);
     const res = await fetch(`${API_URL}/api/upload`, {
       method: 'POST',
+      credentials: 'include',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
     });

@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
@@ -8,6 +9,14 @@ import { config } from '../config';
 const router = Router();
 
 const ADMIN_JWT_SECRET = config.ADMIN_JWT_SECRET;
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: 'Too many admin login attempts, please try again in an hour.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 async function adminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -31,6 +40,7 @@ async function adminAuth(req: Request, res: Response, next: NextFunction): Promi
 
 // ── POST /api/admin/login ─────────────────────────────────────────────────────
 router.post('/login',
+  adminLimiter,
   [body('email').isEmail(), body('password').notEmpty()],
   async (req: Request, res: Response): Promise<void> => {
     try {

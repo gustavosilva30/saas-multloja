@@ -151,8 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = () => {
-    localStorage.removeItem('auth_token');
-    setUser(null);
+    authApi.logout().finally(() => {
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      window.location.href = '/login';
+    });
   };
 
   // RBAC

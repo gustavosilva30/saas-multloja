@@ -1,11 +1,23 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { param, body, validationResult } from 'express-validator';
-import { query, withTransaction } from '../config/database';
+import { query, withTransaction, tenantContext } from '../config/database';
 import { PoolClient } from 'pg';
 
 // Rota completamente pública — sem authenticateToken.
 // Acessada pelo cliente final via link único da OS.
+// Acessada pelo cliente final via link único da OS.
 const router = Router();
+
+const publicOsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.use(publicOsLimiter);
 
 // ── GET /api/public/os/:token — visualização pública ─────────────────────────
 router.get(
@@ -16,7 +28,18 @@ router.get(
     if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
 
     try {
-      const osRes = await query(
+      // 1. Descobrir o tenant_id associado ao token ignorando RLS
+      const tenantRes = await query(`SELECT get_tenant_by_os_token($1) as tenant_id`, [req.params.token]);
+      const tenantId = tenantRes.rows[0]?.tenant_id;
+
+      if (!tenantId) {
+        res.status(404).json({ error: 'Ordem de Serviço não encontrada' });
+        return;
+      }
+
+      // 2. Executar o restante com o contexto do tenant definido
+      await tenantContext.run({ tenantId }, async () => {
+        const osRes = await query(
         `SELECT so.id, so.os_number, so.status, so.asset_metadata,
                 so.customer_notes, so.expected_at,
                 so.subtotal, so.discount, so.total,
@@ -61,6 +84,7 @@ router.get(
           items:         itemsRes.rows,
         },
       });
+      });
     } catch (err) {
       console.error('Public OS view error:', err);
       res.status(500).json({ error: 'Falha ao carregar OS' });
@@ -78,7 +102,18 @@ router.post(
     if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
 
     try {
-      await withTransaction(async (client: PoolClient) => {
+      // 1. Descobrir o tenant_id
+      const tenantRes = await query(`SELECT get_tenant_by_os_token($1) as tenant_id`, [req.params.token]);
+      const tenantId = tenantRes.rows[0]?.tenant_id;
+
+      if (!tenantId) {
+        res.status(404).json({ error: 'Ordem de Serviço não encontrada' });
+        return;
+      }
+
+      // 2. Executar com contexto
+      await tenantContext.run({ tenantId }, async () => {
+        await withTransaction(async (client: PoolClient) => {
         const osRes = await client.query(
           `SELECT id, tenant_id, status, os_number
              FROM service_orders
@@ -118,7 +153,10 @@ router.post(
         );
       });
 
-      res.json({ ok: true, message: 'Ordem de Serviço aprovada com sucesso!' });
+        });
+
+        res.json({ ok: true, message: 'Ordem de Serviço aprovada com sucesso!' });
+      });
     } catch (err: any) {
       console.error('Public OS approve error:', err);
       res.status(err.statusCode ?? 500).json({ error: err.message || 'Falha ao aprovar OS' });

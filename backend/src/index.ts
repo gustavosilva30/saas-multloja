@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -69,6 +70,7 @@ app.use('/api/', limiter);
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 // Logging
 if (config.NODE_ENV !== 'test') {

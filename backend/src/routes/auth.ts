@@ -25,6 +25,26 @@ interface JWTPayload {
   tenantId: string;
 }
 
+const generateTokens = (payload: JWTPayload) => {
+  const accessToken = jwt.sign(payload, config.JWT_SECRET, {
+    expiresIn: config.JWT_EXPIRES_IN as any,
+  });
+  const refreshToken = jwt.sign(payload, config.JWT_REFRESH_SECRET, {
+    expiresIn: config.JWT_REFRESH_EXPIRES_IN as any,
+  });
+  return { accessToken, refreshToken };
+};
+
+const setRefreshCookie = (res: Response, token: string) => {
+  res.cookie('refreshToken', token, {
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/api/auth/refresh', // Only send to refresh endpoint
+  });
+};
+
 // Register new user with tenant
 router.post(
   '/register',
@@ -86,20 +106,18 @@ router.post(
         return userResult.rows[0];
       });
 
-      // Generate JWT
-      const token = jwt.sign(
-        {
-          userId: result.id,
-          email: result.email,
-          role: result.role,
-          tenantId: result.tenant_id,
-        } as JWTPayload,
-        config.JWT_SECRET,
-        { expiresIn: config.JWT_EXPIRES_IN as any }
-      );
+      // Generate Tokens
+      const { accessToken, refreshToken } = generateTokens({
+        userId: result.id,
+        email: result.email,
+        role: result.role,
+        tenantId: result.tenant_id,
+      });
+
+      setRefreshCookie(res, refreshToken);
 
       res.status(201).json({
-        token,
+        token: accessToken,
         user: {
           id: result.id,
           email: result.email,
@@ -165,20 +183,18 @@ router.post(
         [user.id]
       );
 
-      // Generate JWT
-      const token = jwt.sign(
-        {
-          userId: user.id,
-          email: user.email,
-          role: user.role,
-          tenantId: user.tenant_id,
-        } as JWTPayload,
-        config.JWT_SECRET,
-        { expiresIn: config.JWT_EXPIRES_IN as any }
-      );
+      // Generate Tokens
+      const { accessToken, refreshToken } = generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant_id,
+      });
+
+      setRefreshCookie(res, refreshToken);
 
       res.json({
-        token,
+        token: accessToken,
         user: {
           id: user.id,
           email: user.email,
@@ -280,25 +296,41 @@ router.post(
 );
 
 // Refresh token
-router.post('/refresh', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Generate new token with extended expiry
-    const token = jwt.sign(
-      {
-        userId: req.user!.id,
-        email: req.user!.email,
-        role: req.user!.role,
-        tenantId: req.user!.tenant_id,
-      } as JWTPayload,
-      config.JWT_SECRET,
-      { expiresIn: config.JWT_EXPIRES_IN as any }
-    );
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      res.status(401).json({ error: 'Refresh token missing' });
+      return;
+    }
 
-    res.json({ token });
+    const payload = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET) as JWTPayload;
+
+    // Optional: check if user still exists/is active
+    const userRes = await query('SELECT id, email, role, tenant_id FROM user_profiles WHERE id = $1 AND is_active = true', [payload.userId]);
+    if (userRes.rows.length === 0) {
+      res.status(403).json({ error: 'User inactive' });
+      return;
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens({
+      userId: payload.userId,
+      email: payload.email,
+      role: payload.role,
+      tenantId: payload.tenantId,
+    });
+
+    setRefreshCookie(res, newRefreshToken);
+    res.json({ token: accessToken });
   } catch (error) {
-    console.error('Refresh token error:', error);
-    res.status(500).json({ error: 'Failed to refresh token' });
+    res.status(403).json({ error: 'Invalid refresh token' });
   }
+});
+
+// Logout
+router.post('/logout', (req, res) => {
+  res.clearCookie('refreshToken', { path: '/api/auth/refresh' });
+  res.json({ ok: true });
 });
 
 export default router;

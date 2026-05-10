@@ -1,4 +1,5 @@
 import { Pool, PoolClient } from 'pg';
+import { AsyncLocalStorage } from 'async_hooks';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -205,11 +206,17 @@ export async function runMigrations(): Promise<void> {
   }
 }
 
+export const tenantContext = new AsyncLocalStorage<{ tenantId: string }>();
+
 export async function withTransaction<T>(
   callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
   try {
+    const context = tenantContext.getStore();
+    if (context?.tenantId) {
+      await client.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [context.tenantId]);
+    }
     await client.query('BEGIN');
     const result = await callback(client);
     await client.query('COMMIT');
@@ -223,6 +230,16 @@ export async function withTransaction<T>(
 }
 
 export async function query(text: string, params?: any[]) {
+  const context = tenantContext.getStore();
+  if (context?.tenantId) {
+    const client = await pool.connect();
+    try {
+      await client.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [context.tenantId]);
+      return await client.query(text, params);
+    } finally {
+      client.release();
+    }
+  }
   return pool.query(text, params);
 }
 

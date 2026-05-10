@@ -17,8 +17,10 @@ export const config = {
   PORT: parseInt(optional('PORT', '3000')),
 
   JWT_SECRET: required('JWT_SECRET'),
+  JWT_REFRESH_SECRET: optional('JWT_REFRESH_SECRET', (process.env.JWT_SECRET || 'NexusDefaultSecret') + '_refresh'),
   ADMIN_JWT_SECRET: optional('ADMIN_JWT_SECRET', process.env.JWT_SECRET || 'NexusPlatformAdminDefaultSecret'),
-  JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
+  JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '15m'),
+  JWT_REFRESH_EXPIRES_IN: optional('JWT_REFRESH_EXPIRES_IN', '7d'),
 
   // Database — obrigatório, sem fallback
   DATABASE_URL: required('DATABASE_URL'),

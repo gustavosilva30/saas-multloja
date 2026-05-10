@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { query } from '../config/database';
+import { query, tenantContext } from '../config/database';
 
 // Extend Express Request to include user
 declare global {
@@ -71,7 +71,8 @@ export const authenticateToken = async (
       tenant_id: user.tenant_id,
     };
 
-    next();
+    // Run the rest of the request chain inside the tenant context for RLS
+    tenantContext.run({ tenantId: user.tenant_id }, () => next());
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       res.status(403).json({ error: 'Invalid token' });
@@ -116,6 +117,19 @@ export const tenantIsolation = (
   // Add tenant_id to query params or body for downstream use
   req.headers['x-tenant-id'] = req.user.tenant_id;
   next();
+};
+
+// Middleware to wrap request in AsyncLocalStorage for RLS
+export const rlsContext = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.user?.tenant_id) {
+    tenantContext.run({ tenantId: req.user.tenant_id }, () => next());
+  } else {
+    next();
+  }
 };
 
 export default { authenticateToken, authorize, tenantIsolation };

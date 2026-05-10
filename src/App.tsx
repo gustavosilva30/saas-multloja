@@ -25,6 +25,7 @@ import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
 import { WhatsApp } from './pages/WhatsApp';
 import { OsPublicView } from './pages/OsPublicView';
+import { EventScanner } from './pages/EventScanner';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { SuperAdmin } from './pages/SuperAdmin';
@@ -95,6 +96,19 @@ export default function App() {
           <Route path="/os/view/:token" element={<OsPublicView />} />
         </Routes>
       </BrowserRouter>
+    );
+  }
+
+  // Scanner de portaria — autenticado mas sem AppLayout (tela cheia mobile)
+  if (window.location.pathname.startsWith('/eventos/') && window.location.pathname.includes('/scanner')) {
+    return (
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/eventos/:eventId/scanner" element={<EventScanner />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     );
   }
 

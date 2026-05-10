@@ -26,7 +26,8 @@
       "Bash(grep -v \"tenant_id = \\\\$\\\\|tenant_id =\")",
       "Bash(xargs ls -la)",
       "Bash(Remove-Item \"C:\\\\Users\\\\pecas\\\\OneDrive\\\\Área de Trabalho\\\\projetos futuros\\\\saas multloja\\\\src\\\\.env\" -Force)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "PowerShell(cd \"C:\\\\Users\\\\pecas\\\\OneDrive\\\\Área de Trabalho\\\\projetos futuros\\\\saas multloja\"; npm list html5-qrcode 2>$null | Select-String \"html5\" ; npm list @zxing 2>$null | Select-String \"zxing\")"
     ]
   }
 }

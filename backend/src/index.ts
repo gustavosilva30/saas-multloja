@@ -27,6 +27,7 @@ import serviceBundleRoutes from './routes/serviceBundles';
 import publicOsRoutes from './routes/publicOs';
 import whatsappRoutes from './routes/whatsapp';
 import { startMaintenanceReminderJob } from './jobs/osMaintenanceReminder';
+import eventRoutes from './routes/events';
 
 const app = express();
 
@@ -109,6 +110,7 @@ app.use('/api/niches', nicheRoutes);
 app.use('/api/service-orders', serviceOrderRoutes);
 app.use('/api/service-bundles', serviceBundleRoutes);
 app.use('/api/public/os', publicOsRoutes);
+app.use('/api/events', eventRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 
 // Error handling

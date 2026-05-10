@@ -105,18 +105,35 @@ async function handlePaymentConfirmed(payment: NonNullable<AsaasWebhookPayload['
     [payment.customer, tenantId]
   );
 
-  // Registra a transação financeira do pagamento recebido
-  await query(
-    `INSERT INTO financial_transactions
-       (tenant_id, type, category, description, amount, payment_date, status, metadata)
-     VALUES ($1, 'income', 'subscription', 'Pagamento plano - Asaas', $2, NOW(), 'paid', $3)
-     ON CONFLICT DO NOTHING`,
-    [
-      tenantId,
-      payment.netValue ?? payment.value,
-      JSON.stringify({ asaas_payment_id: payment.id, billing_type: payment.billingType }),
-    ]
+  // Ativa todos os módulos vinculados a este payment_id
+  const activatedRes = await query(
+    `UPDATE tenant_modules
+     SET is_active = true, payment_status = 'paid', paid_at = NOW()
+     WHERE asaas_payment_id = $1 AND payment_status = 'pending'
+     RETURNING module_id`,
+    [payment.id]
   );
+
+  const activated = activatedRes.rows.map((r: { module_id: string }) => r.module_id);
+  if (activated.length > 0) {
+    console.log(`✅ Módulos ativados para tenant ${tenantId}: ${activated.join(', ')}`);
+  }
+
+  // Registra a transação financeira do pagamento recebido
+  try {
+    await query(
+      `INSERT INTO financial_transactions
+         (tenant_id, type, category, description, amount, payment_date, status, metadata)
+       VALUES ($1, 'income', 'subscription', 'Pagamento módulos - Asaas', $2, NOW(), 'paid', $3)`,
+      [
+        tenantId,
+        payment.netValue ?? payment.value,
+        JSON.stringify({ asaas_payment_id: payment.id, billing_type: payment.billingType, modules: activated }),
+      ]
+    );
+  } catch {
+    // Tabela financial_transactions pode não existir — não bloqueia ativação dos módulos
+  }
 
   console.log(`✅ Pagamento confirmado para tenant ${tenantId} — R$ ${payment.value}`);
 }

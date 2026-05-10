@@ -93,98 +93,114 @@ router.put('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// ── POST /api/modules/:moduleId/purchase ──────────────────────────────────────
-// Inicia a compra de um módulo premium via Pix (Asaas)
-router.post('/:moduleId/purchase', async (req: Request, res: Response): Promise<void> => {
+// ── POST /api/modules/purchase-bundle ─────────────────────────────────────────
+// Compra múltiplos módulos premium com um único Pix
+router.post('/purchase-bundle', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { moduleId } = req.params;
+    const { moduleIds, cpfCnpj, mobilePhone } = req.body as {
+      moduleIds: string[];
+      cpfCnpj?: string;
+      mobilePhone?: string;
+    };
     const tenantId = req.user!.tenant_id;
 
-    // Buscar dados do módulo
-    const [moduleRes, tenantRes] = await Promise.all([
-      query('SELECT * FROM module_catalog WHERE module_id = $1 AND is_active = true', [moduleId]),
+    if (!Array.isArray(moduleIds) || moduleIds.length === 0) {
+      res.status(400).json({ error: 'Selecione ao menos um módulo' }); return;
+    }
+
+    // Buscar dados dos módulos e do tenant
+    const [catalogRes, tenantRes] = await Promise.all([
+      query(
+        `SELECT * FROM module_catalog WHERE module_id = ANY($1) AND is_active = true AND is_free = false`,
+        [moduleIds]
+      ),
       query('SELECT * FROM tenants WHERE id = $1', [tenantId]),
     ]);
 
-    const module = moduleRes.rows[0];
+    const modules = catalogRes.rows;
     const tenant = tenantRes.rows[0];
 
-    if (!module) { res.status(404).json({ error: 'Módulo não encontrado' }); return; }
-    if (module.is_free) { res.status(400).json({ error: 'Este módulo é gratuito' }); return; }
+    if (modules.length === 0) { res.status(404).json({ error: 'Nenhum módulo premium válido encontrado' }); return; }
 
-    // Verificar se já tem pagamento pendente ou pago
+    // Filtrar módulos já pagos
     const existingRes = await query(
-      'SELECT * FROM tenant_modules WHERE tenant_id = $1 AND module_id = $2',
-      [tenantId, moduleId]
+      `SELECT module_id, payment_status FROM tenant_modules WHERE tenant_id = $1 AND module_id = ANY($2)`,
+      [tenantId, moduleIds]
     );
-    const existing = existingRes.rows[0];
-    if (existing?.payment_status === 'paid') {
-      res.status(409).json({ error: 'Módulo já está ativo' }); return;
-    }
+    const alreadyPaid = new Set(
+      existingRes.rows.filter((r: { payment_status: string }) => r.payment_status === 'paid').map((r: { module_id: string }) => r.module_id)
+    );
+    const toBuy = modules.filter((m: { module_id: string }) => !alreadyPaid.has(m.module_id));
+    if (toBuy.length === 0) { res.status(409).json({ error: 'Todos os módulos selecionados já estão ativos' }); return; }
 
-    // Data de vencimento: amanhã
+    const totalValue = toBuy.reduce((sum: number, m: { price: string }) => sum + Number(m.price), 0);
+    const moduleNames = toBuy.map((m: { name: string }) => m.name).join(', ');
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 1);
     const dueDateStr = dueDate.toISOString().split('T')[0];
 
-    let result;
+    let paymentResult: { asaasCustomerId: string; payment: { id: string; value: number }; pixQrCode: { encodedImage: string; payload: string; expirationDate: string } };
 
     if (!tenant.asaas_customer_id) {
-      // Primeiro pagamento: cria cliente no Asaas
-      const { cpfCnpj, mobilePhone } = req.body;
-      result = await chargeNewCustomerPix({
+      if (!cpfCnpj || !mobilePhone) {
+        res.status(422).json({ error: 'CPF/CNPJ e celular são obrigatórios no primeiro pagamento' }); return;
+      }
+      paymentResult = await chargeNewCustomerPix({
         tenantId,
         tenantName: tenant.name,
-        cpfCnpj,
+        cpfCnpj: cpfCnpj.replace(/\D/g, ''),
         email: req.user!.email,
-        mobilePhone,
-        value: Number(module.price),
-        description: `NexusERP — Módulo ${module.name}`,
+        mobilePhone: mobilePhone.replace(/\D/g, ''),
+        value: totalValue,
+        description: `NexusERP — ${toBuy.length > 1 ? `${toBuy.length} módulos` : moduleNames}`,
         dueDate: dueDateStr,
       });
-
-      // Salvar asaas_customer_id no tenant
       await query(
         'UPDATE tenants SET asaas_customer_id = $1, updated_at = NOW() WHERE id = $2',
-        [result.asaasCustomerId, tenantId]
+        [paymentResult.asaasCustomerId, tenantId]
       );
     } else {
-      // Cliente já existe no Asaas
       const payment = await createAsaasPayment({
         customer: tenant.asaas_customer_id,
         billingType: 'PIX',
-        value: Number(module.price),
+        value: totalValue,
         dueDate: dueDateStr,
-        description: `NexusERP — Módulo ${module.name}`,
+        description: `NexusERP — ${toBuy.length > 1 ? `${toBuy.length} módulos` : moduleNames}`,
         externalReference: tenantId,
       });
-
       const { getAsaasPixQrCode } = await import('../services/asaasService');
       const pixQrCode = await getAsaasPixQrCode(payment.id);
-      result = { asaasCustomerId: tenant.asaas_customer_id, payment, pixQrCode };
+      paymentResult = { asaasCustomerId: tenant.asaas_customer_id, payment, pixQrCode };
     }
 
-    // Registrar cobrança pendente
+    // Registrar todos os módulos como pendentes com o mesmo payment_id
     await withTransaction(async (client) => {
-      await client.query(`
-        INSERT INTO tenant_modules (tenant_id, module_id, is_active, payment_status, asaas_payment_id, activated_at)
-        VALUES ($1, $2, false, 'pending', $3, NOW())
-        ON CONFLICT (tenant_id, module_id)
-        DO UPDATE SET payment_status = 'pending', asaas_payment_id = $3
-      `, [tenantId, moduleId, result.payment.id]);
+      for (const mod of toBuy) {
+        await client.query(`
+          INSERT INTO tenant_modules (tenant_id, module_id, is_active, payment_status, asaas_payment_id, activated_at)
+          VALUES ($1, $2, false, 'pending', $3, NOW())
+          ON CONFLICT (tenant_id, module_id)
+          DO UPDATE SET payment_status = 'pending', asaas_payment_id = $3
+        `, [tenantId, mod.module_id, paymentResult.payment.id]);
+      }
     });
 
     res.json({
-      payment_id: result.payment.id,
-      value: result.payment.value,
+      payment_id: paymentResult.payment.id,
+      value: paymentResult.payment.value,
+      modules: toBuy.map((m: { module_id: string; name: string; price: string }) => ({
+        module_id: m.module_id,
+        name: m.name,
+        price: Number(m.price),
+      })),
       pix: {
-        qr_code_image: result.pixQrCode.encodedImage,
-        copia_e_cola: result.pixQrCode.payload,
-        expires_at: result.pixQrCode.expirationDate,
+        qr_code_image: paymentResult.pixQrCode.encodedImage,
+        copia_e_cola: paymentResult.pixQrCode.payload,
+        expires_at: paymentResult.pixQrCode.expirationDate,
       },
     });
   } catch (err) {
-    console.error('Purchase error:', err);
+    console.error('Bundle purchase error:', err);
     res.status(500).json({ error: 'Falha ao gerar cobrança. Tente novamente.' });
   }
 });

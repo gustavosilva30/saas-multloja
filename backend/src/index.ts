@@ -22,6 +22,7 @@ import adminRoutes from './routes/admin';
 import moduleRoutes from './routes/modules';
 import webhookRoutes from './routes/webhooks';
 import nicheRoutes from './routes/niches';
+import serviceOrderRoutes from './routes/serviceOrders';
 
 const app = express();
 
@@ -101,6 +102,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/modules', moduleRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/niches', nicheRoutes);
+app.use('/api/service-orders', serviceOrderRoutes);
 
 // Error handling
 app.use(notFoundHandler);

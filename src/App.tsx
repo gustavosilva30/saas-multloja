@@ -24,6 +24,7 @@ import { CreditCheck } from './pages/CreditCheck';
 import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
 import { WhatsApp } from './pages/WhatsApp';
+import { OsPublicView } from './pages/OsPublicView';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { SuperAdmin } from './pages/SuperAdmin';
@@ -83,9 +84,18 @@ function RouterConfig() {
 }
 
 export default function App() {
-  // Rota /superadmin é completamente separada do sistema de auth de tenant
+  // Rotas completamente públicas — sem auth
   if (window.location.pathname.startsWith('/superadmin')) {
     return <SuperAdmin />;
+  }
+  if (window.location.pathname.startsWith('/os/view/')) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/os/view/:token" element={<OsPublicView />} />
+        </Routes>
+      </BrowserRouter>
+    );
   }
 
   return (

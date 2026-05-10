@@ -23,7 +23,10 @@ import moduleRoutes from './routes/modules';
 import webhookRoutes from './routes/webhooks';
 import nicheRoutes from './routes/niches';
 import serviceOrderRoutes from './routes/serviceOrders';
+import serviceBundleRoutes from './routes/serviceBundles';
+import publicOsRoutes from './routes/publicOs';
 import whatsappRoutes from './routes/whatsapp';
+import { startMaintenanceReminderJob } from './jobs/osMaintenanceReminder';
 
 const app = express();
 
@@ -104,6 +107,8 @@ app.use('/api/modules', moduleRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/niches', nicheRoutes);
 app.use('/api/service-orders', serviceOrderRoutes);
+app.use('/api/service-bundles', serviceBundleRoutes);
+app.use('/api/public/os', publicOsRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 
 // Error handling
@@ -123,6 +128,9 @@ async function startServer() {
 
   // Run DB migrations (creates missing tables)
   await runMigrations();
+
+  // Scheduled jobs
+  startMaintenanceReminderJob();
 
   // Initialize MinIO in background — failure won't crash the server
   initializeBucket()

@@ -50,6 +50,9 @@ export const config = {
   // Evolution API — WhatsApp
   EVOLUTION_API_URL: optional('EVOLUTION_API_URL', 'https://crm-loja-evolution-api.ini6ln.easypanel.host'),
   EVOLUTION_API_KEY: optional('EVOLUTION_API_KEY', ''),
+
+  // URL pública do frontend — usada para gerar links de aprovação de OS
+  APP_PUBLIC_URL: optional('APP_PUBLIC_URL', 'https://gsntech.com.br'),
 };
 
 export default config;

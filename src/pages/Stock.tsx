@@ -164,9 +164,74 @@ function KebabMenu({
   );
 }
 
-// ── Product Drawer (tabs) ─────────────────────────────────────────────────────
+// ── Multi-select chip input ───────────────────────────────────────────────────
 
-type DrawerTab = 'general' | 'niche' | 'stock';
+function MultiSelect({
+  value, options, onChange, placeholder,
+}: {
+  value: string[]; options: string[]; onChange: (v: string[]) => void; placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const filtered = options.filter(o =>
+    o.toLowerCase().includes(search.toLowerCase()) && !value.includes(o)
+  );
+
+  const remove = (item: string) => onChange(value.filter(v => v !== item));
+  const add = (item: string) => { onChange([...value, item]); setSearch(''); };
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => setOpen(true)}
+        className="min-h-[40px] w-full bg-white border border-zinc-200 rounded-lg px-2.5 py-1.5 text-sm focus-within:border-blue-500 transition-colors cursor-text flex flex-wrap items-center gap-1.5"
+      >
+        {value.map(v => (
+          <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
+            {v}
+            <button type="button" onClick={e => { e.stopPropagation(); remove(v); }} className="hover:text-blue-900">
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+        <input
+          value={search}
+          onChange={e => { setSearch(e.target.value); setOpen(true); }}
+          placeholder={value.length === 0 ? placeholder : ''}
+          className="flex-1 min-w-[80px] bg-transparent outline-none text-sm placeholder:text-zinc-400"
+        />
+        <ChevronDown size={14} className="text-zinc-400 shrink-0" />
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-52 overflow-auto py-1">
+          {filtered.map(o => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => add(o)}
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-zinc-50 text-zinc-700"
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Product Drawer (sectioned with side nav) ──────────────────────────────────
+
+const SECTIONS = ['general', 'name', 'niche', 'config'] as const;
+type Section = typeof SECTIONS[number];
 
 function ProductDrawer({
   product,
@@ -193,7 +258,9 @@ function ProductDrawer({
   } : EMPTY_FORM;
 
   const [form, setForm] = useState<ProductForm>(() => buildForm(product));
-  const [tab, setTab] = useState<DrawerTab>('general');
+  const [activeSection, setActiveSection] = useState<Section>('general');
+  const sectionRefs = useRef<Record<Section, HTMLDivElement | null>>({ general: null, name: null, niche: null, config: null });
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -264,260 +331,264 @@ function ProductDrawer({
     setUploading(false);
   };
 
-  const inputCls = 'w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 dark:text-white transition-colors';
-  const labelCls = 'block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1 uppercase tracking-wide';
+  const inputCls = 'w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all';
+  const labelCls = 'block text-sm font-medium text-zinc-700 mb-1.5';
 
-  const tabs: { id: DrawerTab; label: string }[] = [
+  const scrollTo = (sec: Section) => {
+    setActiveSection(sec);
+    sectionRefs.current[sec]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const navItems: { id: Section; label: string }[] = [
     { id: 'general', label: 'Informações Gerais' },
-    ...(nicheTemplate ? [{ id: 'niche' as DrawerTab, label: nicheTemplate.name }] : []),
-    { id: 'stock', label: 'Estoque' },
+    { id: 'name',    label: 'Nome do Produto' },
+    ...(nicheTemplate ? [{ id: 'niche' as Section, label: 'Nicho de Atuação' }] : []),
+    { id: 'config',  label: 'Configurações' },
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex justify-end" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={onClose}>
       <div
-        className="bg-white dark:bg-zinc-900 w-full max-w-xl h-full flex flex-col shadow-2xl"
+        className="bg-zinc-50 w-full max-w-3xl h-full flex flex-col shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
-          <div>
-            <h2 className="font-bold text-base dark:text-white">
-              {product ? 'Editar Produto' : 'Novo Produto'}
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              {product ? `SKU: ${product.sku}` : 'Preencha os dados do produto'}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-zinc-200 dark:border-zinc-800 px-6">
-          {tabs.map(t => (
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-zinc-200 shrink-0">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-500">
+                <X size={18} />
+              </button>
+              <h2 className="font-semibold text-zinc-800 text-[15px]">
+                {product ? 'Edita um Produto' : 'Novo Produto'}
+              </h2>
+            </div>
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                'px-1 py-3 mr-5 text-sm font-medium border-b-2 transition-colors',
-                tab === t.id
-                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-              )}
+              type="submit" disabled={saving}
+              className="px-5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
             >
-              {t.label}
+              {saving ? (uploading ? 'Enviando…' : 'Salvando…') : 'Salvar'}
             </button>
-          ))}
-        </div>
+          </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm rounded-lg px-4 py-2.5">
-                {error}
-              </div>
-            )}
+          {error && (
+            <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-md px-4 py-2.5">
+              {error}
+            </div>
+          )}
 
-            {/* ── Aba: Informações Gerais ── */}
-            {tab === 'general' && (
-              <>
-                {/* Image */}
-                <div>
-                  <label className={labelCls}>Foto do Produto</label>
-                  <div className="flex gap-4 items-start">
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
+          {/* Body: side nav + content */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Side nav */}
+            <nav className="w-52 shrink-0 px-5 py-6 border-r border-zinc-200 bg-zinc-50">
+              <ul className="space-y-1">
+                {navItems.map(item => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => scrollTo(item.id)}
                       className={cn(
-                        'w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0',
-                        previewUrl
-                          ? 'border-zinc-200 dark:border-zinc-700'
-                          : 'border-zinc-300 dark:border-zinc-700 hover:border-emerald-500'
+                        'w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors',
+                        activeSection === item.id
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800'
                       )}
                     >
-                      {previewUrl ? (
-                        <img src={previewUrl} alt="" className="w-full h-full object-cover rounded-xl" />
-                      ) : (
-                        <>
-                          <ImageIcon size={22} className="text-zinc-400 mb-1" />
-                          <span className="text-[10px] text-zinc-400">Clique para enviar</span>
-                        </>
-                      )}
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            {/* Content */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+
+              {/* ── Card: Informações Gerais ────────────────────────── */}
+              <section
+                ref={el => { sectionRefs.current.general = el; }}
+                className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
+              >
+                <h3 className="text-base font-semibold text-zinc-800 mb-5">Informações Gerais</h3>
+
+                <div className="flex gap-6">
+                  {/* Image upload */}
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-40 h-40 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors shrink-0 overflow-hidden relative group"
+                  >
+                    {previewUrl ? (
+                      <>
+                        <img src={previewUrl} alt="" className="w-full h-full object-contain" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-1 text-xs text-zinc-600 border-t border-zinc-200 group-hover:bg-blue-50">
+                          Elige image
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon size={28} className="text-zinc-300 mb-2" />
+                        <span className="text-xs text-zinc-500">Elige image</span>
+                      </>
+                    )}
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+
+                  <div className="flex-1 space-y-4">
+                    <div ref={el => { sectionRefs.current.name = el; }}>
+                      <label className={labelCls}>Nome do Produto</label>
+                      <input
+                        required value={form.name} onChange={set('name')}
+                        placeholder="Pastilha de Freio GSN Pro"
+                        className={inputCls}
+                      />
                     </div>
-                    <div className="flex-1 space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-400 hover:border-zinc-400 transition-colors"
-                      >
-                        <Upload size={14} /> {uploading ? 'Enviando…' : 'Selecionar imagem'}
-                      </button>
-                      {previewUrl && (
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedFile(null); setPreviewUrl(null); setForm(p => ({ ...p, image_url: '' })); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                          className="text-xs text-red-500 hover:underline"
-                        >
-                          Remover imagem
-                        </button>
-                      )}
-                      <p className="text-xs text-zinc-400">JPG, PNG até 5 MB</p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Fabricante</label>
+                        <input
+                          value={form.metadata.fabricante ?? ''}
+                          onChange={e => setMeta('fabricante', e.target.value)}
+                          placeholder="GSN Parts"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Preço <span className="text-zinc-400 font-normal">(R$)</span></label>
+                        <input
+                          required type="number" step="0.01" min="0"
+                          value={form.sale_price} onChange={set('sale_price')}
+                          placeholder="0,00"
+                          className={inputCls}
+                        />
+                        {margin !== null && (
+                          <p className={cn('text-xs mt-1', parseFloat(margin) >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                            Margem: {margin}%
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+
+                    <div>
+                      <label className={labelCls}>Descrição</label>
+                      <textarea
+                        value={form.description} onChange={set('description')}
+                        rows={2}
+                        placeholder=""
+                        className={cn(inputCls, 'resize-none')}
+                      />
+                    </div>
                   </div>
                 </div>
+              </section>
 
-                {/* Name */}
-                <div>
-                  <label className={labelCls}>Nome do Produto *</label>
-                  <input required value={form.name} onChange={set('name')} placeholder="Ex: Pastilha de Freio GSN Pro" className={inputCls} />
-                </div>
+              {/* ── Card: Nicho de Atuação ──────────────────────────── */}
+              {nicheTemplate && (
+                <section
+                  ref={el => { sectionRefs.current.niche = el; }}
+                  className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
+                >
+                  <h3 className="text-base font-semibold text-zinc-800 mb-5">
+                    Nicho de Atuação <span className="text-zinc-400 font-normal">({nicheTemplate.name})</span>
+                  </h3>
 
-                {/* SKU + Barcode */}
+                  {nicheTemplate.form_schema.length === 0 ? (
+                    <p className="text-sm text-zinc-400 text-center py-4">Nenhum campo configurado para este nicho.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {nicheTemplate.form_schema.map((field, idx) => {
+                        const isMulti = field.type === 'multiselect';
+                        const isFullWidth = isMulti || idx === nicheTemplate.form_schema.length - 1 && nicheTemplate.form_schema.length % 2 === 1;
+                        return (
+                          <div key={field.key} className={isMulti || isFullWidth ? 'col-span-2' : ''}>
+                            <label className={labelCls}>{field.label}</label>
+                            {field.type === 'select' ? (
+                              <div className="relative">
+                                <select
+                                  value={form.metadata[field.key] ?? ''}
+                                  onChange={e => setMeta(field.key, e.target.value)}
+                                  className={cn(inputCls, 'appearance-none pr-8')}
+                                >
+                                  <option value="">Selecionar…</option>
+                                  {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                              </div>
+                            ) : field.type === 'multiselect' ? (
+                              <MultiSelect
+                                value={(form.metadata[field.key] ?? '').split(',').filter(Boolean)}
+                                options={field.options ?? []}
+                                onChange={vs => setMeta(field.key, vs.join(','))}
+                                placeholder={field.placeholder ?? `Buscar a ${field.label.toLowerCase()}…`}
+                              />
+                            ) : (
+                              <input
+                                type={field.type === 'number' ? 'number' : 'text'}
+                                value={form.metadata[field.key] ?? ''}
+                                onChange={e => setMeta(field.key, e.target.value)}
+                                placeholder={field.placeholder ?? ''}
+                                className={inputCls}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* ── Card: Configurações ─────────────────────────────── */}
+              <section
+                ref={el => { sectionRefs.current.config = el; }}
+                className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
+              >
+                <h3 className="text-base font-semibold text-zinc-800 mb-5">Configurações</h3>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>SKU *</label>
+                    <label className={labelCls}>SKU</label>
                     <input required value={form.sku} onChange={set('sku')} placeholder="GSN-001" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Código de Barras</label>
                     <input value={form.barcode} onChange={set('barcode')} placeholder="7891234567890" className={inputCls} />
                   </div>
-                </div>
-
-                {/* Prices */}
-                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Categoria</label>
+                    <div className="relative">
+                      <select value={form.category_id} onChange={set('category_id')} className={cn(inputCls, 'appearance-none pr-8')}>
+                        <option value="">Sem categoria</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Unidade</label>
+                    <div className="relative">
+                      <select value={form.unit} onChange={set('unit')} className={cn(inputCls, 'appearance-none pr-8')}>
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
                   <div>
                     <label className={labelCls}>Preço de Custo</label>
                     <input type="number" step="0.01" min="0" value={form.cost_price} onChange={set('cost_price')} placeholder="0,00" className={inputCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>
-                      Preço de Venda *
-                      {margin !== null && (
-                        <span className={cn('ml-2 font-normal normal-case tracking-normal', parseFloat(margin) >= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                          {margin}% margem
-                        </span>
-                      )}
-                    </label>
-                    <input required type="number" step="0.01" min="0" value={form.sale_price} onChange={set('sale_price')} placeholder="0,00" className={inputCls} />
-                  </div>
-                </div>
-
-                {/* Category + Unit */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Categoria</label>
-                    <select value={form.category_id} onChange={set('category_id')} className={inputCls}>
-                      <option value="">Sem categoria</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Unidade</label>
-                    <select value={form.unit} onChange={set('unit')} className={inputCls}>
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className={labelCls}>Descrição</label>
-                  <textarea
-                    value={form.description} onChange={set('description')}
-                    rows={3} placeholder="Descrição do produto..."
-                    className={cn(inputCls, 'resize-none')}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* ── Aba: Nicho ── */}
-            {tab === 'niche' && nicheTemplate && (
-              <>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Campos específicos para <span className="font-semibold text-zinc-700 dark:text-zinc-300">{nicheTemplate.name}</span>.
-                </p>
-                {nicheTemplate.form_schema.map(field => (
-                  <div key={field.key}>
-                    <label className={labelCls}>{field.label}</label>
-                    {field.type === 'select' ? (
-                      <select
-                        value={form.metadata[field.key] ?? ''}
-                        onChange={e => setMeta(field.key, e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">Selecionar…</option>
-                        {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : (
-                      <input
-                        type={field.type === 'number' ? 'number' : 'text'}
-                        value={form.metadata[field.key] ?? ''}
-                        onChange={e => setMeta(field.key, e.target.value)}
-                        placeholder={field.placeholder ?? ''}
-                        className={inputCls}
-                      />
-                    )}
-                  </div>
-                ))}
-                {nicheTemplate.form_schema.length === 0 && (
-                  <p className="text-sm text-zinc-400 text-center py-8">Nenhum campo dinâmico configurado para este nicho.</p>
-                )}
-              </>
-            )}
-
-            {/* ── Aba: Estoque ── */}
-            {tab === 'stock' && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelCls}>Quantidade em Estoque</label>
+                    <label className={labelCls}>Estoque Inicial</label>
                     <input type="number" min="0" value={form.stock_quantity} onChange={set('stock_quantity')} className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Estoque Mínimo</label>
                     <input type="number" min="0" value={form.min_stock} onChange={set('min_stock')} className={inputCls} />
-                    <p className="text-xs text-zinc-400 mt-1">Alertas de baixo estoque abaixo deste valor</p>
+                    <p className="text-xs text-zinc-400 mt-1">Alerta abaixo desta quantidade</p>
                   </div>
                 </div>
-                {product && (
-                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-4 space-y-2">
-                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Resumo atual</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">Estoque atual</span>
-                      <span className="text-sm font-bold dark:text-white">{product.stock_quantity} {product.unit}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">Valor em estoque</span>
-                      <span className="text-sm font-bold dark:text-white">{fmtBRL(product.stock_quantity * product.cost_price)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">Status</span>
-                      <StatusBadge status={stockStatus(product)} />
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex gap-3 shrink-0">
-            <button
-              type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit" disabled={saving}
-              className="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              {saving ? (uploading ? 'Enviando imagem…' : 'Salvando…') : (product ? 'Salvar alterações' : 'Adicionar produto')}
-            </button>
+              </section>
+            </div>
           </div>
         </form>
       </div>

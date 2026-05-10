@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, type FormEvent, type ChangeEv
 import {
   Search, Plus, Package, X, RefreshCw, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, Upload, Image as ImageIcon,
-  ChevronLeft, ChevronRight, Filter,
+  ChevronLeft, ChevronRight, Filter, LayoutGrid, List as ListIcon,
 } from 'lucide-react';
 import { uploadApi } from '../lib/api';
 import { cn } from '../lib/utils';
@@ -297,8 +297,12 @@ function ProductDrawer({
       let imageUrl = form.image_url;
       if (selectedFile) {
         setUploading(true);
-        const r = await uploadApi.upload(selectedFile);
-        imageUrl = r.url;
+        try {
+          const r = await uploadApi.upload(selectedFile);
+          imageUrl = r.url;
+        } catch (uploadErr) {
+          console.warn('Upload falhou, salvando produto sem imagem:', uploadErr);
+        }
         setUploading(false);
       }
       const body = {
@@ -794,6 +798,9 @@ export function Stock() {
   ] : [];
 
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [view, setView] = useState<'list' | 'grid'>(() => (localStorage.getItem('stock_view') as 'list' | 'grid') || 'list');
+
+  useEffect(() => { localStorage.setItem('stock_view', view); }, [view]);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -809,6 +816,30 @@ export function Stock() {
               placeholder="Buscar"
               className="w-full pl-9 pr-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-zinc-300 focus:bg-white text-zinc-700 placeholder:text-zinc-400 transition-all"
             />
+          </div>
+
+          {/* View toggle */}
+          <div className="flex items-center bg-zinc-50 border border-zinc-200 rounded-lg p-0.5">
+            <button
+              onClick={() => setView('list')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                view === 'list' ? 'bg-white shadow-sm text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'
+              )}
+              title="Lista"
+            >
+              <ListIcon size={15} />
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                view === 'grid' ? 'bg-white shadow-sm text-zinc-800' : 'text-zinc-400 hover:text-zinc-600'
+              )}
+              title="Cards"
+            >
+              <LayoutGrid size={15} />
+            </button>
           </div>
 
           <div className="relative">
@@ -857,8 +888,8 @@ export function Stock() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-6">
+      {/* Body */}
+      <div className="flex-1 overflow-auto px-6 pb-6">
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -868,6 +899,63 @@ export function Stock() {
             <Package size={36} className="mb-3 opacity-40" />
             <p className="text-sm font-medium">Nenhum produto encontrado</p>
             <p className="text-xs mt-1">Tente outros filtros ou adicione um produto</p>
+          </div>
+        ) : view === 'grid' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {products.map(p => (
+              <div
+                key={p.id}
+                className={cn(
+                  'group bg-white rounded-xl border border-zinc-200 hover:border-zinc-300 hover:shadow-md transition-all overflow-hidden flex flex-col',
+                  selected.has(p.id) && 'ring-2 ring-emerald-400 border-transparent'
+                )}
+              >
+                {/* Image area */}
+                <div className="relative bg-zinc-50 aspect-square">
+                  {p.image_url ? (
+                    <img src={p.image_url} alt={p.name} className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package size={36} className="text-zinc-300" />
+                    </div>
+                  )}
+                  {/* Top-left checkbox */}
+                  <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="rounded border-zinc-300 accent-emerald-500 bg-white"
+                    />
+                  </div>
+                  {/* Top-right kebab */}
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur rounded-md">
+                    <KebabMenu
+                      onEdit={() => { setDrawerProduct(p); setDrawerOpen(true); }}
+                      onDuplicate={() => handleDuplicate(p)}
+                      onDelete={() => setDeleteTarget(p)}
+                    />
+                  </div>
+                  {/* Bottom-left status */}
+                  <div className="absolute bottom-2 left-2">
+                    <StatusBadge status={stockStatus(p)} />
+                  </div>
+                </div>
+
+                {/* Body */}
+                <div
+                  className="p-3 flex-1 flex flex-col cursor-pointer"
+                  onClick={() => { setDrawerProduct(p); setDrawerOpen(true); }}
+                >
+                  <p className="text-xs text-zinc-400 mb-0.5">{p.sku}</p>
+                  <p className="text-sm font-medium text-zinc-800 line-clamp-2 leading-snug mb-2">{p.name}</p>
+                  <div className="flex items-end justify-between mt-auto">
+                    <span className="text-base font-bold text-zinc-800">{fmtBRL(p.sale_price)}</span>
+                    <span className="text-xs text-zinc-400">{p.stock_quantity} {p.unit}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <table className="w-full text-sm border-separate border-spacing-0">

@@ -262,14 +262,20 @@ router.delete('/groups/:groupId/goals/:goalId', wrap(async (req, res) => {
 router.get('/groups/:groupId/tasks', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
   const { status } = req.query as Record<string, string>;
+  const ALLOWED_STATUS = ['PENDING', 'DONE', 'CANCELLED'];
+  const params: any[] = [gid(req), tid(req)];
+  let statusFilter = "AND ft.status != 'CANCELLED'";
+  if (status && ALLOWED_STATUS.includes(status)) {
+    statusFilter = `AND ft.status = $3`;
+    params.push(status);
+  }
   const r = await query(
     `SELECT ft.*, am.name AS assigned_name, am.avatar_emoji, am.avatar_color, am.role AS assigned_role
      FROM family_tasks ft
      LEFT JOIN family_members am ON am.id = ft.assigned_to_member_id
-     WHERE ft.group_id = $1 AND ft.tenant_id = $2
-       ${status ? `AND ft.status = '${status}'` : "AND ft.status != 'CANCELLED'"}
+     WHERE ft.group_id = $1 AND ft.tenant_id = $2 ${statusFilter}
      ORDER BY ft.due_date NULLS LAST, ft.created_at DESC`,
-    [gid(req), tid(req)]
+    params
   );
   res.json({ tasks: r.rows });
 }));
@@ -374,15 +380,18 @@ router.delete('/groups/:groupId/tasks/:taskId', wrap(async (req, res) => {
 router.get('/groups/:groupId/events', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
   const { start, end } = req.query as Record<string, string>;
+  const ISO = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/;
+  const params: any[] = [gid(req), tid(req)];
+  const filters: string[] = [];
+  if (start && ISO.test(start)) { params.push(start); filters.push(`AND fe.event_date >= $${params.length}`); }
+  if (end   && ISO.test(end))   { params.push(end);   filters.push(`AND fe.event_date <= $${params.length}`); }
   const r = await query(
     `SELECT fe.*, fm.name AS member_name, fm.avatar_emoji
      FROM family_events fe
      LEFT JOIN family_members fm ON fm.id = fe.member_id
-     WHERE fe.group_id = $1 AND fe.tenant_id = $2
-       ${start ? `AND fe.event_date >= '${start}'` : ''}
-       ${end   ? `AND fe.event_date <= '${end}'`   : ''}
+     WHERE fe.group_id = $1 AND fe.tenant_id = $2 ${filters.join(' ')}
      ORDER BY fe.event_date`,
-    [gid(req), tid(req)]
+    params
   );
   res.json({ events: r.rows });
 }));

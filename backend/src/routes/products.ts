@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { body, query as queryValidator, validationResult } from 'express-validator';
 import { query, withTransaction } from '../config/database';
 import { authenticateToken, authorize, tenantIsolation } from '../middleware/auth';
+import { syncStockToML } from '../services/EcommerceService';
 
 const router = Router();
 
@@ -399,6 +400,10 @@ router.put(
           [...values, tenantId]
         );
 
+        if (req.body.stock_quantity !== undefined) {
+          syncStockToML(tenantId, productId, result.rows[0].stock_quantity);
+        }
+
         res.json({ product: result.rows[0] });
       }
     } catch (error) {
@@ -477,6 +482,9 @@ router.patch(
       }
 
       // TODO: Log stock movement to audit table
+
+      // Sincronizar com e-commerce (Mercado Livre) em background
+      syncStockToML(tenantId, productId, result.rows[0].stock_quantity);
 
       res.json({
         product: result.rows[0],

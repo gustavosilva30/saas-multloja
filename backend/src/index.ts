@@ -32,6 +32,7 @@ import { startFamilyAgendaJob } from './jobs/familyAgendaJob';
 import eventRoutes from './routes/events';
 import financeRoutes from './routes/finance';
 import familyRoutes from './routes/family';
+import ecommerceRoutes from './routes/ecommerce';
 
 const app = express();
 
@@ -118,6 +119,8 @@ app.use('/api/events', eventRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/family', familyRoutes);
+app.use('/api/ecommerce', ecommerceRoutes);
+app.use('/ml', ecommerceRoutes); // Suporte para o callback do Mercado Livre na raiz
 
 // Error handling
 app.use(notFoundHandler);

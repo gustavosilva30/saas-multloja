@@ -52,7 +52,12 @@ export const config = {
   EVOLUTION_API_KEY: optional('EVOLUTION_API_KEY', ''),
 
   // URL pública do frontend — usada para gerar links de aprovação de OS
-  APP_PUBLIC_URL: optional('APP_PUBLIC_URL', 'https://gsntech.com.br'),
+  APP_PUBLIC_URL: optional('APP_PUBLIC_URL', 'https://douradosap.com.br'),
+
+  // Mercado Livre
+  ML_CLIENT_ID: optional('ML_CLIENT_ID', '1175427003647678'),
+  ML_CLIENT_SECRET: optional('ML_CLIENT_SECRET', 'Pvq3D97LD9Ew2dWa0Rezp9N5jTX4sikK'),
+  ML_REDIRECT_URI: optional('ML_REDIRECT_URI', 'https://api.douradosap.com.br/ml/callback'),
 };
 
 export default config;

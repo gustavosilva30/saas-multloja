@@ -11,6 +11,10 @@ import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
 import { useTenant } from "../contexts/TenantContext";
 import { useAuth } from "../contexts/AuthContext";
+import { VoiceAssistantProvider } from "../contexts/VoiceAssistantContext";
+import { GlobalMicButton } from "../components/GlobalMicButton";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -153,9 +157,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { theme, setTheme } = useTheme();
   const { activeModules, resetTenant } = useTenant();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    const handleVoiceCommand = (e: any) => {
+      const { intent, params } = e.detail;
+      if (intent === 'NAVIGATE') {
+        const routes: Record<string, string> = {
+          estoque: '/stock',
+          vendas: '/sales',
+          financeiro: '/finance',
+          clientes: '/customers',
+          pdv: '/pos',
+          caixa: '/pos',
+          'e-commerce': '/ecommerce',
+          ajustes: '/settings'
+        };
+        const targetPath = routes[params.target];
+        if (targetPath) navigate(targetPath);
+      }
+    };
+    window.addEventListener('voice-command', handleVoiceCommand);
+    return () => window.removeEventListener('voice-command', handleVoiceCommand);
+  }, [navigate]);
+
   const activeSet = new Set(activeModules);
+  const isVoiceAssistantActive = activeSet.has('voice_assistant');
 
   // Which groups have an active page (for defaultOpen)
   const activeGroupIndices = new Set(
@@ -217,7 +245,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const currentItem = ALL_GROUPS.flatMap(g => g.items).find(i => i.path === location.pathname);
   const pageTitle = currentItem?.label ?? '';
 
-  return (
+  const content = (
     <div className="flex h-screen bg-white overflow-hidden text-zinc-900 font-sans">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex">{sidebar}</div>
@@ -280,6 +308,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
           {children}
         </div>
       </main>
+
+      {isVoiceAssistantActive && <GlobalMicButton />}
     </div>
   );
+
+  if (isVoiceAssistantActive) {
+    return (
+      <VoiceAssistantProvider>
+        {content}
+      </VoiceAssistantProvider>
+    );
+  }
+
+  return content;
 }

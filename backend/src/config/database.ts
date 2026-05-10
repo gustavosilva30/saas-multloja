@@ -105,14 +105,17 @@ export async function runMigrations(): Promise<void> {
         ('bin_check',    'Consulta BIN',              'Identificação de cartões de crédito/débito',                       'Vendas',      19.90, false, 20),
         ('modules',               'App Store',                 'Marketplace de módulos e configurações',                           'Gestão',      0.00,  true,  21),
         ('settings',              'Ajustes',                   'Configurações gerais do sistema',                                  'Gestão',      0.00,  true,  22),
-        ('whatsapp_integration',  'WhatsApp Business',         'Envio automático de notificações, OS e cobranças via WhatsApp',   'Integração',  59.90, false, 23)
+        ('whatsapp_integration',  'WhatsApp Business',         'Envio automático de notificações, OS e cobranças via WhatsApp',   'Integração',  59.90, false, 23),
+        ('family_hub',            'Gestão Familiar',           'Hub completo para casais e famílias: finanças, tarefas, metas e agenda', 'Pessoal', 24.90, false, 24)
       ON CONFLICT (module_id) DO NOTHING
     `);
 
     // Garante módulos adicionados após seed inicial (upsert por nome para não perder preço customizado)
     await client.query(`
       INSERT INTO module_catalog (module_id, name, description, category, price, is_free, sort_order)
-      VALUES ('whatsapp_integration', 'WhatsApp Business', 'Envio automático de notificações, OS e cobranças via WhatsApp', 'Integração', 59.90, false, 23)
+      VALUES
+        ('whatsapp_integration', 'WhatsApp Business', 'Envio automático de notificações, OS e cobranças via WhatsApp', 'Integração', 59.90, false, 23),
+        ('family_hub', 'Gestão Familiar', 'Hub completo para casais e famílias: finanças, tarefas, metas e agenda', 'Pessoal', 24.90, false, 24)
       ON CONFLICT (module_id) DO UPDATE SET
         name        = EXCLUDED.name,
         description = EXCLUDED.description,

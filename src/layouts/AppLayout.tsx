@@ -5,7 +5,7 @@ import {
   Bell, Search, Moon, Sun, Monitor, Component, Wrench, FileSearch,
   Ticket, Zap, Mic, Store, Megaphone, Smartphone, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone,
+  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone, Heart,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
@@ -67,6 +67,12 @@ const ALL_GROUPS: NavGroup[] = [
       { id: 'credit_check',icon: ShieldCheck,label: 'SCPC',  path: '/credit-check' },
       { id: 'plate_check', icon: CarFront,   label: 'Placa', path: '/plate-check' },
       { id: 'bin_check',   icon: CreditCard, label: 'BIN',   path: '/bin-check' },
+    ],
+  },
+  {
+    label: 'Pessoal', icon: Heart,
+    items: [
+      { id: 'family_hub', icon: Heart, label: 'Família', path: '/family' },
     ],
   },
   {

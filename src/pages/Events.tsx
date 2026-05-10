@@ -5,6 +5,7 @@ import {
   QrCode, Loader2, X, AlertCircle, ChevronRight, Clock,
   BarChart3, Send, Search, UserPlus, RefreshCw,
 } from 'lucide-react';
+import { EventWizard } from '../components/EventWizard';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
@@ -39,72 +40,6 @@ const fmtDate = (s: string) => new Date(s).toLocaleDateString('pt-BR', {
 const fmtCurrency = (v: string | number) =>
   Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// ── Modal: Criar Evento ───────────────────────────────────────────────────────
-function NewEventModal({ token, onClose, onCreated }: {
-  token: string; onClose: () => void; onCreated: (ev: Event) => void;
-}) {
-  const [form, setForm] = useState({ name: '', date: '', end_date: '', location: '', description: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const submit = async () => {
-    if (!form.name || !form.date) { setError('Nome e data são obrigatórios'); return; }
-    setSaving(true);
-    try {
-      const r = await fetch(`${API}/api/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...form, end_date: form.end_date || undefined }),
-      });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error || 'Erro ao criar evento'); setSaving(false); return; }
-      onCreated(d.event);
-    } catch { setError('Falha de conexão'); setSaving(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md shadow-2xl"
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-          <h2 className="font-bold text-zinc-900 dark:text-white">Novo Evento</h2>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white"><X size={18} /></button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          {[
-            { label: 'Nome do Evento *', key: 'name', type: 'text', placeholder: 'Ex: Workshop de Vendas' },
-            { label: 'Data de Início *', key: 'date', type: 'datetime-local', placeholder: '' },
-            { label: 'Data de Término', key: 'end_date', type: 'datetime-local', placeholder: '' },
-            { label: 'Local', key: 'location', type: 'text', placeholder: 'Endereço ou link online' },
-          ].map(({ label, key, type, placeholder }) => (
-            <div key={key}>
-              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
-              <input type={type} placeholder={placeholder} value={(form as any)[key]}
-                onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:text-white dark:[color-scheme:dark]"
-              />
-            </div>
-          ))}
-          <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Descrição</label>
-            <textarea rows={3} value={form.description}
-              onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm resize-none focus:outline-none dark:text-white"
-            />
-          </div>
-          {error && <p className="text-red-500 text-sm flex items-center gap-1"><AlertCircle size={14} />{error}</p>}
-        </div>
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-zinc-100 dark:border-zinc-800">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-white">Cancelar</button>
-          <button onClick={submit} disabled={saving}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm disabled:opacity-50">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : null} Criar Evento
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Modal: Detalhe do Evento + Convidados ─────────────────────────────────────
 function EventDetailModal({ event, token, onClose }: {
@@ -492,8 +427,39 @@ export function Events() {
       </div>
 
       {showNew && (
-        <NewEventModal token={token} onClose={() => setShowNew(false)}
-          onCreated={ev => { setEvents(prev => [ev as any, ...prev]); setShowNew(false); }}
+        <EventWizard 
+          onClose={() => setShowNew(false)}
+          onSuccess={async (data) => {
+            // Transform data for API
+            const payload = {
+              name: data.name,
+              category: data.category,
+              description: data.description,
+              date: data.start_date,
+              end_date: data.end_date,
+              location: data.type === 'online' ? data.online_link : data.location_name,
+              status: 'PUBLISHED',
+              ticket_types: data.tickets.map(t => ({
+                name: t.name,
+                price: t.price,
+                capacity: t.capacity
+              }))
+            };
+
+            const r = await fetch(`${API}/api/events`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(payload),
+            });
+            
+            if (r.ok) {
+              fetchEvents();
+              setShowNew(false);
+            } else {
+              const d = await r.json();
+              alert(d.error || 'Erro ao criar evento');
+            }
+          }}
         />
       )}
 

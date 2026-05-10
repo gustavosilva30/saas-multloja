@@ -258,7 +258,16 @@ function ProductDrawer({
   const [activeSection, setActiveSection] = useState<Section>('general');
   const sectionRefs = useRef<Record<Section, HTMLDivElement | null>>({ general: null, name: null, niche: null, config: null });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [nextSku, setNextSku] = useState<string>('');
   const [saving, setSaving] = useState(false);
+
+  // Fetch next sequential SKU when creating a new product
+  useEffect(() => {
+    if (product) return;
+    apiFetch<{ sku: string }>('/next-sku')
+      .then(d => setNextSku(d.sku))
+      .catch(() => {});
+  }, [product]);
   const [error, setError] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(product?.image_url ?? null);
@@ -306,7 +315,8 @@ function ProductDrawer({
         setUploading(false);
       }
       const body = {
-        name: form.name, sku: form.sku,
+        name: form.name,
+        sku: form.sku.trim() || undefined,
         barcode: form.barcode || undefined,
         description: form.description || undefined,
         category_id: form.category_id || undefined,
@@ -548,8 +558,17 @@ function ProductDrawer({
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className={labelCls}>SKU</label>
-                    <input required value={form.sku} onChange={set('sku')} placeholder="GSN-001" className={inputCls} />
+                    <label className={labelCls}>
+                      SKU
+                      {!product && <span className="text-zinc-400 font-normal"> (automático)</span>}
+                    </label>
+                    <input
+                      value={form.sku}
+                      onChange={set('sku')}
+                      placeholder={!product && nextSku ? `Próximo: ${nextSku}` : 'GSN-001'}
+                      className={inputCls}
+                      disabled={!!product}
+                    />
                   </div>
                   <div>
                     <label className={labelCls}>Código de Barras</label>

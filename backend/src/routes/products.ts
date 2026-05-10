@@ -92,6 +92,30 @@ router.get(
   }
 );
 
+// Get next sequential SKU for the tenant (01, 02, ...)
+async function getNextSku(tenantId: string): Promise<string> {
+  const r = await query(
+    `SELECT COALESCE(MAX(sku::int), 0) + 1 AS next
+       FROM products
+      WHERE tenant_id = $1 AND sku ~ '^[0-9]+$'`,
+    [tenantId]
+  );
+  const next = r.rows[0]?.next ?? 1;
+  return String(next).padStart(2, '0');
+}
+
+// Public endpoint to peek the next SKU (used by the product form for placeholder)
+// IMPORTANT: registered before GET /:id so it doesn't get captured as an id.
+router.get('/next-sku', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const sku = await getNextSku(req.user!.tenant_id);
+    res.json({ sku });
+  } catch (err) {
+    console.error('Next SKU error:', err);
+    res.status(500).json({ error: 'Failed to get next SKU' });
+  }
+});
+
 // Get single product
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -124,7 +148,7 @@ router.post(
   authorize('owner', 'admin', 'operator'),
   [
     body('name').trim().isLength({ min: 2 }),
-    body('sku').trim().isLength({ min: 1 }),
+    body('sku').optional({ checkFalsy: true }).trim(),
     body('sale_price').isFloat({ min: 0 }),
     body('cost_price').optional().isFloat({ min: 0 }),
     body('stock_quantity').optional().isInt({ min: 0 }),
@@ -141,7 +165,6 @@ router.post(
       const tenantId = req.user!.tenant_id;
       const {
         name,
-        sku,
         description,
         category_id,
         cost_price,
@@ -152,6 +175,12 @@ router.post(
         barcode,
         image_url,
       } = req.body;
+
+      // Auto-generate sequential SKU if not supplied
+      let sku: string = (req.body.sku || '').toString().trim();
+      if (!sku) {
+        sku = await getNextSku(tenantId);
+      }
 
       // Check SKU uniqueness within tenant
       const existingSku = await query(

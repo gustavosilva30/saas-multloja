@@ -139,8 +139,7 @@ router.post(
       const { email, password } = req.body;
 
       const userRes = await query(
-        `SELECT id, email, password_hash, role, tenant_id, full_name, is_active, token_version
-           FROM user_profiles WHERE LOWER(email) = LOWER($1)`,
+        `SELECT * FROM find_user_by_email($1)`,
         [email]
       );
       if (userRes.rows.length === 0) {
@@ -191,8 +190,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     }
 
     const r = await query(
-      `SELECT id, email, role, tenant_id, full_name, is_active, token_version
-         FROM user_profiles WHERE id = $1`,
+      `SELECT * FROM find_user_by_id($1)`,
       [decoded.userId]
     );
     const user = r.rows[0];

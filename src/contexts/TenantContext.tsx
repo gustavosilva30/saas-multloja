@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 
 export type Niche = 'varejo' | 'oficina' | 'clinica' | 'restaurante' | null;
-export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check';
+export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check' | 'whatsapp_integration';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 

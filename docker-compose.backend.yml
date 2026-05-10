@@ -1,11 +1,12 @@
 version: '3.8'
 
 # ============================================================
-# NEXUS BACKEND - PostgreSQL + MinIO + Redis
+# NEXUS BACKEND - PostgreSQL + MinIO (Redis Externo)
 # ============================================================
 # Este compose é para a branch backend-api
 # Substitui o Supabase por PostgreSQL puro + MinIO
 # Otimizado para deploy no Easypanel (sem Nginx - usa Traefik)
+# Redis agora é gerenciado de forma independente pelo Easypanel.
 # ============================================================
 
 services:
@@ -60,26 +61,6 @@ services:
       - nexus-backend
 
   # ============================================================
-  # REDIS - Cache e sessões
-  # ============================================================
-  redis:
-    image: redis:7-alpine
-    container_name: nexus-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "127.0.0.1:6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks:
-      - nexus-backend
-
-  # ============================================================
   # BACKEND API - Node.js (desenvolvimento)
   # ============================================================
   backend-dev:
@@ -92,7 +73,10 @@ services:
       NODE_ENV: development
       PORT: 3000
       DATABASE_URL: postgresql://nexus:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/nexus_erp
-      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
       SEED_SECRET: ${SEED_SECRET:-}
@@ -111,8 +95,6 @@ services:
       postgres:
         condition: service_healthy
       minio:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     command: npm run dev
     networks:
@@ -133,7 +115,10 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://nexus:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/nexus_erp
-      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@${REDIS_HOST}:${REDIS_PORT:-6379}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
       SEED_SECRET: ${SEED_SECRET:-}
@@ -152,8 +137,6 @@ services:
       postgres:
         condition: service_healthy
       minio:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - nexus-backend
@@ -186,8 +169,6 @@ volumes:
   postgres_data:
     driver: local
   minio_data:
-    driver: local
-  redis_data:
     driver: local
   pgadmin_data:
     driver: local

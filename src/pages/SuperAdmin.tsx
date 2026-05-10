@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, MouseEvent } from 'react';
-import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X, Tag, Save, Loader2 } from 'lucide-react';
+import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X, Tag, Save, Loader2, Sun, Moon, Monitor } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
@@ -278,6 +279,26 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [selected, setSelected] = useState<TenantDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Theme state
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('admin_theme') as 'light' | 'dark' | 'system') || 'dark';
+  });
+
+  // Apply theme effect
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+    
+    localStorage.setItem('admin_theme', theme);
+  }, [theme]);
 
   const load = async () => {
     setLoading(true);
@@ -308,17 +329,43 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+      <header className="bg-gray-900 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center font-bold text-sm">S</div>
           <div>
-            <p className="font-bold text-sm">NexusERP</p>
-            <p className="text-xs text-gray-400">Super Admin</p>
+            <p className="font-bold text-sm text-gray-900 dark:text-white">NexusERP</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Super Admin</p>
           </div>
         </div>
-        <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-          <LogOut size={16} /> Sair
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-950 p-1 rounded-lg border border-gray-200 dark:border-gray-800">
+            <button 
+              onClick={() => setTheme('light')}
+              className={cn("p-1.5 rounded-md text-gray-500 transition-all", theme === 'light' ? 'bg-white shadow-sm text-yellow-500' : 'hover:text-gray-900')}
+              title="Tema claro"
+            >
+              <Sun size={14} />
+            </button>
+            <button 
+              onClick={() => setTheme('system')}
+              className={cn("p-1.5 rounded-md text-gray-500 transition-all", theme === 'system' ? 'bg-white dark:bg-gray-800 shadow-sm text-gray-900 dark:text-gray-100' : 'hover:text-gray-900 dark:hover:text-gray-300')}
+              title="Tema do sistema"
+            >
+              <Monitor size={14} />
+            </button>
+            <button 
+              onClick={() => setTheme('dark')}
+              className={cn("p-1.5 rounded-md text-gray-500 transition-all", theme === 'dark' ? 'bg-gray-800 shadow-sm text-indigo-400' : 'hover:text-gray-300')}
+              title="Tema escuro"
+            >
+              <Moon size={14} />
+            </button>
+          </div>
+          <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+            <LogOut size={16} /> Sair
+          </button>
+        </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">

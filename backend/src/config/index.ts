@@ -46,6 +46,10 @@ export const config = {
   ASAAS_API_KEY: optional('ASAAS_API_KEY', ''),
   ASAAS_API_URL: optional('ASAAS_API_URL', 'https://sandbox.asaas.com'),
   ASAAS_WEBHOOK_TOKEN: optional('ASAAS_WEBHOOK_TOKEN', ''),
+
+  // Evolution API — WhatsApp
+  EVOLUTION_API_URL: optional('EVOLUTION_API_URL', 'https://crm-loja-evolution-api.ini6ln.easypanel.host'),
+  EVOLUTION_API_KEY: optional('EVOLUTION_API_KEY', ''),
 };
 
 export default config;

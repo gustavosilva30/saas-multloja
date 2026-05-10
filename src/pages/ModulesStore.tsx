@@ -16,6 +16,7 @@ const MODULE_ICONS: Record<string, ElementType> = {
   delivery: Smartphone, image_editor: ImageIcon, messages: MessageSquare,
   calendar: CalendarDays, freight_quote: Truck, credit_check: ShieldCheck,
   plate_check: CarFront, bin_check: CreditCard, modules: Package, settings: Settings,
+  whatsapp_integration: Phone,
 };
 
 interface CatalogModule {

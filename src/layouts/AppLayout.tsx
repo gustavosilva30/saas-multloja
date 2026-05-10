@@ -58,6 +58,7 @@ const ALL_GROUPS: NavGroup[] = [
       { id: 'messages',     icon: MessageSquare,label: 'Recados',path: '/messages' },
       { id: 'calendar',     icon: CalendarDays, label: 'Calendário',path: '/calendar' },
       { id: 'image_editor', icon: ImageIcon, label: 'Editor Imagem',path: '/image-editor' },
+      { id: 'whatsapp_integration', icon: Phone, label: 'WhatsApp', path: '/whatsapp' },
     ],
   },
   {

@@ -23,6 +23,7 @@ import moduleRoutes from './routes/modules';
 import webhookRoutes from './routes/webhooks';
 import nicheRoutes from './routes/niches';
 import serviceOrderRoutes from './routes/serviceOrders';
+import whatsappRoutes from './routes/whatsapp';
 
 const app = express();
 
@@ -103,6 +104,7 @@ app.use('/api/modules', moduleRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/niches', nicheRoutes);
 app.use('/api/service-orders', serviceOrderRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Error handling
 app.use(notFoundHandler);

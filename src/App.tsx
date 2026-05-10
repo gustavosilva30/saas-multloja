@@ -23,6 +23,7 @@ import { FreightQuote } from './pages/FreightQuote';
 import { CreditCheck } from './pages/CreditCheck';
 import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
+import { WhatsApp } from './pages/WhatsApp';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { SuperAdmin } from './pages/SuperAdmin';
@@ -74,6 +75,7 @@ function RouterConfig() {
         <Route path="/credit-check" element={<ProtectedRoute minimumRoleLevel={2}><CreditCheck /></ProtectedRoute>} />
         <Route path="/plate-check" element={<ProtectedRoute minimumRoleLevel={2}><PlateCheck /></ProtectedRoute>} />
         <Route path="/bin-check" element={<ProtectedRoute minimumRoleLevel={2}><BinCheck /></ProtectedRoute>} />
+        <Route path="/whatsapp" element={<ProtectedRoute minimumRoleLevel={2}><WhatsApp /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

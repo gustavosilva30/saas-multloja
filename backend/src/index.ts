@@ -120,7 +120,8 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/ecommerce', ecommerceRoutes);
-app.use('/ml', ecommerceRoutes); // Suporte para o callback do Mercado Livre na raiz
+app.use('/ml', ecommerceRoutes); // Suporte para /ml/callback
+app.use('/api/mercadolivre/auth', ecommerceRoutes); // Suporte para /api/mercadolivre/auth/callback
 
 // Error handling
 app.use(notFoundHandler);

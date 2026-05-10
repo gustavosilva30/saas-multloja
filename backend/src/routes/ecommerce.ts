@@ -25,7 +25,7 @@ router.get('/mercadolivre/auth', authenticateToken, (req: Request, res: Response
 });
 
 // 2. Callback (ML redireciona para cá com o código)
-router.get('/ml/callback', async (req: Request, res: Response) => {
+router.get('/callback', async (req: Request, res: Response) => {
   const { code, state } = req.query;
   
   if (!code) return res.status(400).json({ error: 'Código de autorização ausente' });

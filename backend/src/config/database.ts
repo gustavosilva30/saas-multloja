@@ -103,8 +103,7 @@ export async function runMigrations(): Promise<void> {
         ('credit_check', 'Consulta SCPC/Serasa',      'Análise de crédito de clientes antes da venda',                    'Vendas',      29.90, false, 18),
         ('plate_check',  'Consulta de Placa',         'Informações completas de veículos pela placa',                     'Operação',    19.90, false, 19),
         ('bin_check',    'Consulta BIN',              'Identificação de cartões de crédito/débito',                       'Vendas',      19.90, false, 20),
-        ('modules',               'App Store',                 'Marketplace de módulos e configurações',                           'Gestão',      0.00,  true,  21),
-        ('settings',              'Ajustes',                   'Configurações gerais do sistema',                                  'Gestão',      0.00,  true,  22),
+
         ('whatsapp_integration',  'WhatsApp Business',         'Envio automático de notificações, OS e cobranças via WhatsApp',   'Integração',  59.90, false, 23),
         ('family_hub',            'Gestão Familiar',           'Hub completo para casais e famílias: finanças, tarefas, metas e agenda', 'Pessoal', 24.90, false, 24)
       ON CONFLICT (module_id) DO NOTHING

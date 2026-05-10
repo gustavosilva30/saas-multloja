@@ -22,51 +22,51 @@ const ALL_GROUPS: NavGroup[] = [
     label: 'Principal', icon: LayoutDashboard,
     items: [
       { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-      { id: 'pos',       icon: ShoppingCart,    label: 'PDV',        path: '/pos' },
+      { id: 'pos', icon: ShoppingCart, label: 'PDV', path: '/pos' },
     ],
   },
   {
     label: 'Catálogo', icon: Folder,
     items: [
-      { id: 'stock',   icon: Box,        label: 'Produtos',         path: '/stock' },
+      { id: 'stock', icon: Box, label: 'Produtos', path: '/stock' },
       { id: 'catalog', icon: FileSearch, label: 'Catálogo/Matriz', path: '/catalog' },
     ],
   },
   {
     label: 'Vendas', icon: ShoppingBag,
     items: [
-      { id: 'customers', icon: Users,    label: 'Clientes',   path: '/customers' },
-      { id: 'finance',   icon: BarChart3,label: 'Financeiro', path: '/finance' },
-      { id: 'services',  icon: WrenchIcon,label: 'Serviços/OS',path: '/services' },
-      { id: 'events',    icon: Ticket,   label: 'Eventos',    path: '/events' },
+      { id: 'customers', icon: Users, label: 'Clientes', path: '/customers' },
+      { id: 'finance', icon: BarChart3, label: 'Financeiro', path: '/finance' },
+      { id: 'services', icon: WrenchIcon, label: 'Serviços/OS', path: '/services' },
+      { id: 'events', icon: Ticket, label: 'Eventos', path: '/events' },
     ],
   },
   {
     label: 'Marketing', icon: Sparkles,
     items: [
-      { id: 'ecommerce',  icon: Store,      label: 'E-commerce', path: '/ecommerce' },
-      { id: 'marketing',  icon: Megaphone,  label: 'Marketing',  path: '/marketing' },
-      { id: 'automations',icon: Zap,        label: 'Automações', path: '/automations' },
-      { id: 'ai_assistant',icon: Mic,       label: 'Assistente IA',path: '/ai-assistant' },
+      { id: 'ecommerce', icon: Store, label: 'E-commerce', path: '/ecommerce' },
+      { id: 'marketing', icon: Megaphone, label: 'Marketing', path: '/marketing' },
+      { id: 'automations', icon: Zap, label: 'Automações', path: '/automations' },
+      { id: 'ai_assistant', icon: Mic, label: 'Assistente IA', path: '/ai-assistant' },
     ],
   },
   {
     label: 'Operações', icon: Phone,
     items: [
-      { id: 'delivery',     icon: Smartphone,label: 'Entregas',  path: '/delivery' },
-      { id: 'freight_quote',icon: Truck,     label: 'Frete',     path: '/freight-quote' },
-      { id: 'messages',     icon: MessageSquare,label: 'Recados',path: '/messages' },
-      { id: 'calendar',     icon: CalendarDays, label: 'Calendário',path: '/calendar' },
-      { id: 'image_editor', icon: ImageIcon, label: 'Editor Imagem',path: '/image-editor' },
+      { id: 'delivery', icon: Smartphone, label: 'Entregas', path: '/delivery' },
+      { id: 'freight_quote', icon: Truck, label: 'Frete', path: '/freight-quote' },
+      { id: 'messages', icon: MessageSquare, label: 'Recados', path: '/messages' },
+      { id: 'calendar', icon: CalendarDays, label: 'Calendário', path: '/calendar' },
+      { id: 'image_editor', icon: ImageIcon, label: 'Editor Imagem', path: '/image-editor' },
       { id: 'whatsapp_integration', icon: Phone, label: 'WhatsApp', path: '/whatsapp' },
     ],
   },
   {
     label: 'Consultas', icon: FileQuestion,
     items: [
-      { id: 'credit_check',icon: ShieldCheck,label: 'SCPC',  path: '/credit-check' },
-      { id: 'plate_check', icon: CarFront,   label: 'Placa', path: '/plate-check' },
-      { id: 'bin_check',   icon: CreditCard, label: 'BIN',   path: '/bin-check' },
+      { id: 'credit_check', icon: ShieldCheck, label: 'SCPC', path: '/credit-check' },
+      { id: 'plate_check', icon: CarFront, label: 'Placa', path: '/plate-check' },
+      { id: 'bin_check', icon: CreditCard, label: 'BIN', path: '/bin-check' },
     ],
   },
   {
@@ -78,8 +78,8 @@ const ALL_GROUPS: NavGroup[] = [
   {
     label: 'Configurações', icon: Cog,
     items: [
-      { id: 'modules',  icon: Component, label: 'App Store', path: '/modules' },
-      { id: 'settings', icon: Settings,  label: 'Ajustes',   path: '/settings' },
+      { id: 'modules', icon: Component, label: 'App Store', path: '/modules' },
+      { id: 'settings', icon: Settings, label: 'Ajustes', path: '/settings' },
     ],
   },
 ];

@@ -266,18 +266,25 @@ router.post('/transactions', wrap(async (req, res) => {
       : [],
   };
 
-  const created = await createTransaction(tid(req), data);
+  // 🔒 C4: tx do withTenantContext propagada para o service via client.
+  // RLS WITH CHECK rejeita o INSERT se data.tenant_id não bater.
+  const created = await withTenantContext(tid(req), (client) =>
+    createTransaction(tid(req), data, client)
+  );
   res.status(201).json({ transactions: created, count: created.length });
 }));
 
 router.get('/transactions/:id', wrap(async (req, res) => {
-  const r = await query(
-    `SELECT ft.*, ba.name AS bank_account_name, coa.name AS chart_of_account_name
-     FROM financial_transactions ft
-     LEFT JOIN bank_accounts ba ON ba.id = ft.bank_account_id
-     LEFT JOIN chart_of_accounts coa ON coa.id = ft.chart_of_account_id
-     WHERE ft.id = $1 AND ft.tenant_id = $2`,
-    [req.params.id, tid(req)]
+  // 🔒 C4: filtro de tenant via RLS — sem AND ft.tenant_id no Node.
+  const r = await withTenantContext(tid(req), (client) =>
+    client.query(
+      `SELECT ft.*, ba.name AS bank_account_name, coa.name AS chart_of_account_name
+       FROM financial_transactions ft
+       LEFT JOIN bank_accounts ba ON ba.id = ft.bank_account_id
+       LEFT JOIN chart_of_accounts coa ON coa.id = ft.chart_of_account_id
+       WHERE ft.id = $1`,
+      [req.params.id]
+    )
   );
   if (!r.rows.length) return res.status(404).json({ error: 'Transação não encontrada' });
   res.json({ transaction: r.rows[0] });
@@ -338,36 +345,47 @@ router.put('/transactions/:id', wrap(async (req, res) => {
     }
   }
   if (!sets.length) return res.status(400).json({ error: 'Nenhum campo para atualizar' });
-  params.push(req.params.id, tid(req));
-  const r = await query(
-    `UPDATE financial_transactions SET ${sets.join(', ')}, updated_at = NOW()
-     WHERE id = $${i} AND tenant_id = $${i+1} AND status != 'paid' RETURNING *`,
-    params
+  params.push(req.params.id);
+
+  // 🔒 C4: filtro de tenant agora é responsabilidade do RLS (USING + WITH CHECK).
+  const r = await withTenantContext(tid(req), (client) =>
+    client.query(
+      `UPDATE financial_transactions SET ${sets.join(', ')}, updated_at = NOW()
+       WHERE id = $${i} AND status != 'paid' RETURNING *`,
+      params
+    )
   );
   if (!r.rows.length) return res.status(404).json({ error: 'Transação não encontrada ou já paga' });
   res.json({ transaction: r.rows[0] });
 }));
 
 router.delete('/transactions/:id', wrap(async (req, res) => {
-  const r = await query(
-    `UPDATE financial_transactions SET status = 'cancelled', updated_at = NOW()
-     WHERE id = $1 AND tenant_id = $2 AND status != 'paid' RETURNING id`,
-    [req.params.id, tid(req)]
+  // 🔒 C4: RLS isola pelo tenant — sem AND tenant_id no Node.
+  const r = await withTenantContext(tid(req), (client) =>
+    client.query(
+      `UPDATE financial_transactions SET status = 'cancelled', updated_at = NOW()
+       WHERE id = $1 AND status != 'paid' RETURNING id`,
+      [req.params.id]
+    )
   );
   if (!r.rows.length) return res.status(404).json({ error: 'Transação não encontrada ou já paga' });
   res.json({ ok: true });
 }));
 
 router.patch('/transactions/:id/pay', wrap(async (req, res) => {
-  const payment_date   = parseISODate(req.body.payment_date, 'payment_date');
+  const payment_date    = parseISODate(req.body.payment_date, 'payment_date');
   const bank_account_id = optionalUUID(req.body.bank_account_id, 'bank_account_id');
 
-  // 🔒 C3: valida que a conta bancária pertence ao tenant antes de gravá-la
+  // 🔒 C3: valida que a conta bancária pertence ao tenant antes de gravá-la.
+  // (Mesmo com RLS, validar antes evita erro genérico de policy violation.)
   if (bank_account_id) {
     await assertTenantOwnership('bank_accounts', bank_account_id, tid(req), 'bank_account', 'AND is_active = true');
   }
 
-  const tx = await payTransaction(req.params.id, tid(req), payment_date, bank_account_id);
+  // 🔒 C4: payTransaction agora aceita o client e roda o UPDATE sob RLS.
+  const tx = await withTenantContext(tid(req), (client) =>
+    payTransaction(req.params.id, tid(req), payment_date, bank_account_id, client)
+  );
   res.json({ transaction: tx });
 }));
 

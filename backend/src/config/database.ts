@@ -4,28 +4,71 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required');
+// =============================================================================
+// 🔒 C4 / Fase 2 — Separação de credenciais por finalidade
+// =============================================================================
+// • DATABASE_URL_APP        — usado pelo POOL principal (role: app_runtime)
+//                             SEM BYPASSRLS → as policies de RLS são impostas.
+// • DATABASE_URL_MIGRATOR   — usado APENAS pelo runMigrations() no boot
+//                             (role: migrator) com BYPASSRLS para DDL/seed.
+// • DATABASE_URL (fallback) — compatibilidade durante a migração. Se as duas
+//                             específicas não estiverem setadas, usamos esta
+//                             para AMBOS os pools — comportamento legado.
+//                             EM PRODUÇÃO, defina as duas separadas.
+// =============================================================================
+
+const APP_URL      = process.env.DATABASE_URL_APP      || process.env.DATABASE_URL;
+const MIGRATOR_URL = process.env.DATABASE_URL_MIGRATOR || process.env.DATABASE_URL;
+
+if (!APP_URL) {
+  throw new Error('DATABASE_URL_APP (ou DATABASE_URL fallback) é obrigatório');
+}
+if (!MIGRATOR_URL) {
+  throw new Error('DATABASE_URL_MIGRATOR (ou DATABASE_URL fallback) é obrigatório');
 }
 
+// Aviso caso esteja rodando com fallback em produção (configuração insegura).
+if (process.env.NODE_ENV === 'production'
+    && (!process.env.DATABASE_URL_APP || !process.env.DATABASE_URL_MIGRATOR)) {
+  console.warn(
+    '⚠️  ATENÇÃO: rodando em produção SEM separação de roles. ' +
+    'Defina DATABASE_URL_APP e DATABASE_URL_MIGRATOR para ativar o RLS de verdade.'
+  );
+}
+
+// ── Pool principal — role app_runtime (sofre RLS) ────────────────────────────
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: APP_URL,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
 
 pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL');
+  console.log('✅ App pool connected to PostgreSQL');
 });
 
 pool.on('error', (err: Error) => {
-  console.error('❌ PostgreSQL error:', err);
+  console.error('❌ App pool error:', err);
+});
+
+// ── Pool de migração — role migrator (BYPASSRLS) ─────────────────────────────
+// Pool separado e MENOR — usado só por runMigrations() no boot. Não fica
+// disponível ao runtime para evitar uso acidental que bypassaria RLS.
+const migratorPool = new Pool({
+  connectionString: MIGRATOR_URL,
+  max: 2,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
+
+migratorPool.on('error', (err: Error) => {
+  console.error('❌ Migrator pool error:', err);
 });
 
 // Auto-migration: creates missing tables on startup
 export async function runMigrations(): Promise<void> {
-  const client = await pool.connect();
+  const client = await migratorPool.connect();
   try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS platform_admins (
@@ -203,6 +246,9 @@ export async function runMigrations(): Promise<void> {
     console.error('❌ Migration error:', err);
   } finally {
     client.release();
+    // Drena o pool do migrator — não queremos manter conexões com BYPASSRLS
+    // ociosas em runtime. Próximas migrations (deploys futuros) abrem novas.
+    await migratorPool.end().catch(() => { /* ignore */ });
   }
 }
 
@@ -215,7 +261,7 @@ export async function withTransaction<T>(
   try {
     const context = tenantContext.getStore();
     if (context?.tenantId) {
-      await client.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [context.tenantId]);
+      await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [context.tenantId]);
     }
     await client.query('BEGIN');
     const result = await callback(client);
@@ -234,7 +280,7 @@ export async function query(text: string, params?: any[]) {
   if (context?.tenantId) {
     const client = await pool.connect();
     try {
-      await client.query(`SELECT set_config('app.current_tenant_id', $1, true)`, [context.tenantId]);
+      await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [context.tenantId]);
       return await client.query(text, params);
     } finally {
       client.release();

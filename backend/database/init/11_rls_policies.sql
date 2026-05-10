@@ -49,7 +49,7 @@ BEGIN
     -- Pula silenciosamente se a tabela ainda não existe (banco em estado
     -- intermediário durante migrations encadeadas).
     IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = tbl AND schemaname = 'public') THEN
-      RAISE NOTICE 'RLS: tabela %% não existe, pulando', tbl;
+      RAISE NOTICE 'RLS: tabela % não existe, pulando', tbl;
       CONTINUE;
     END IF;
 

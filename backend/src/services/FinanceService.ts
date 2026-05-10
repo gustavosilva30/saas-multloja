@@ -155,20 +155,35 @@ export interface TransactionInput {
   category?:            string;
 }
 
-export async function createTransaction(tenantId: string, data: TransactionInput) {
+/**
+ * Cria uma ou mais transações (parcelamento / recorrência).
+ *
+ * @param tenantId — sempre derivado do JWT no controller
+ * @param data
+ * @param client — opcional. Se fornecido, usa esse client (que já está numa
+ *                 transação com `app.tenant_id` setado pelo withTenantContext).
+ *                 Se omitido, abre uma withTransaction própria — comportamento
+ *                 legado para callers que ainda não migraram para RLS.
+ *
+ * 🔒 C4: o tenant_id ainda é gravado explicitamente (NOT NULL) mas a policy
+ * WITH CHECK rejeita o INSERT se não bater com current_tenant_id().
+ */
+export async function createTransaction(
+  tenantId: string,
+  data: TransactionInput,
+  client?: PoolClient
+) {
   const installments = Math.max(1, data.installments ?? 1);
-  const created: any[] = [];
+  const months       = data.recurrent ? (data.recurrent_months ?? 12) : installments;
+  const groupId      = installments > 1 || data.recurrent ? crypto.randomUUID() : null;
 
-  await withTransaction(async (client: PoolClient) => {
-    const groupId = installments > 1 || data.recurrent ? crypto.randomUUID() : null;
-
-    const months = data.recurrent ? (data.recurrent_months ?? 12) : installments;
-
+  const insertAll = async (c: PoolClient) => {
+    const created: any[] = [];
     for (let i = 0; i < months; i++) {
-      const dueDate = addMonths(data.due_date, i);
+      const dueDate        = addMonths(data.due_date, i);
       const competenceDate = data.competence_date ? addMonths(data.competence_date, i) : dueDate;
 
-      const res = await client.query(
+      const res = await c.query(
         `INSERT INTO financial_transactions
            (tenant_id, bank_account_id, chart_of_account_id, cost_center_id, contact_id,
             type, description, amount, due_date, competence_date, status, payment_date,
@@ -183,9 +198,7 @@ export async function createTransaction(tenantId: string, data: TransactionInput
           data.cost_center_id       ?? null,
           data.contact_id           ?? null,
           data.type,
-          installments > 1
-            ? `${data.description} (${i + 1}/${months})`
-            : data.description,
+          installments > 1 ? `${data.description} (${i + 1}/${months})` : data.description,
           data.amount / (data.recurrent ? 1 : installments),
           dueDate,
           competenceDate,
@@ -202,29 +215,60 @@ export async function createTransaction(tenantId: string, data: TransactionInput
       );
       created.push(res.rows[0]);
     }
-  });
+    return created;
+  };
 
+  // Se o caller já abriu uma tx (via withTenantContext), reusa-a.
+  // Senão, abre uma tx própria — fallback para callers legados.
+  if (client) return insertAll(client);
+  let created: any[] = [];
+  await withTransaction(async (c) => { created = await insertAll(c); });
   return created;
 }
 
 // ── Baixar (pagar) transação ───────────────────────────────────────────────────
+/**
+ * Marca uma transação como paga.
+ *
+ * @param client — opcional. Se fornecido, usa-o (transação RLS-scoped).
+ *
+ * 🔒 C4: removido `AND tenant_id = $X` — o RLS impõe o filtro quando o
+ * client veio de withTenantContext. No modo legado (sem client), o filtro
+ * de tenant é mantido para preservar o isolamento.
+ */
 export async function payTransaction(
   id: string,
   tenantId: string,
   paymentDate: string,
-  bankAccountId?: string
+  bankAccountId?: string,
+  client?: PoolClient
 ) {
-  const res = await query(
-    `UPDATE financial_transactions
-       SET status          = 'paid',
-           payment_date    = $1,
-           bank_account_id = COALESCE($2, bank_account_id),
-           updated_at      = NOW()
-     WHERE id = $3 AND tenant_id = $4 AND status != 'paid'
-     RETURNING *`,
-    [paymentDate, bankAccountId ?? null, id, tenantId]
-  );
-  if (res.rows.length === 0) throw Object.assign(new Error('Transação não encontrada ou já paga'), { statusCode: 404 });
+  const sql = client
+    ? // RLS-scoped: o filtro de tenant é automático via policy USING
+      `UPDATE financial_transactions
+         SET status          = 'paid',
+             payment_date    = $1,
+             bank_account_id = COALESCE($2, bank_account_id),
+             updated_at      = NOW()
+       WHERE id = $3 AND status != 'paid'
+       RETURNING *`
+    : // Modo legado (sem RLS): mantém AND tenant_id por defesa em profundidade
+      `UPDATE financial_transactions
+         SET status          = 'paid',
+             payment_date    = $1,
+             bank_account_id = COALESCE($2, bank_account_id),
+             updated_at      = NOW()
+       WHERE id = $3 AND tenant_id = $4 AND status != 'paid'
+       RETURNING *`;
+
+  const params = client
+    ? [paymentDate, bankAccountId ?? null, id]
+    : [paymentDate, bankAccountId ?? null, id, tenantId];
+
+  const res = client ? await client.query(sql, params) : await query(sql, params);
+  if (res.rows.length === 0) {
+    throw Object.assign(new Error('Transação não encontrada ou já paga'), { statusCode: 404 });
+  }
   return res.rows[0];
 }
 
@@ -263,15 +307,16 @@ export function parseOfx(ofxText: string): OfxTransaction[] {
 export async function importOfxTransactions(
   tenantId: string,
   bankAccountId: string,
-  txns: OfxTransaction[]
+  txns: OfxTransaction[],
+  client?: PoolClient
 ): Promise<{ imported: number; skipped: number }> {
   let imported = 0;
   let skipped  = 0;
 
-  await withTransaction(async (client: PoolClient) => {
+  const importAll = async (c: PoolClient) => {
     for (const tx of txns) {
       try {
-        await client.query(
+        await c.query(
           `INSERT INTO financial_transactions
              (tenant_id, bank_account_id, type, description, amount, due_date,
               competence_date, payment_date, status, is_conciliated, ofx_transaction_id)
@@ -288,7 +333,10 @@ export async function importOfxTransactions(
         else throw err;
       }
     }
-  });
+  };
+
+  if (client) await importAll(client);
+  else        await withTransaction(importAll);
 
   return { imported, skipped };
 }

@@ -10,6 +10,7 @@ import { ModulesStore } from './pages/ModulesStore';
 import { Customers } from './pages/Customers';
 import { Catalog } from './pages/Catalog';
 import { Events } from './pages/Events';
+import { FamilyHub } from './pages/FamilyHub';
 import { Services } from './pages/Services';
 import { Automations } from './pages/Automations';
 import { AIAssistant } from './pages/AIAssistant';
@@ -64,6 +65,7 @@ function RouterConfig() {
         <Route path="/finance" element={<ProtectedRoute requiredPermission="canViewFinancialReports"><Finance /></ProtectedRoute>} />
         <Route path="/modules" element={<ProtectedRoute requiredPermission="canManageModules"><ModulesStore /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute minimumRoleLevel={3}><Events /></ProtectedRoute>} />
+        <Route path="/family" element={<ProtectedRoute minimumRoleLevel={2}><FamilyHub /></ProtectedRoute>} />
         <Route path="/services" element={<ProtectedRoute requiredPermission="canManageStock"><Services /></ProtectedRoute>} />
         <Route path="/automations" element={<ProtectedRoute minimumRoleLevel={3}><Automations /></ProtectedRoute>} />
         <Route path="/ai-assistant" element={<ProtectedRoute minimumRoleLevel={3}><AIAssistant /></ProtectedRoute>} />

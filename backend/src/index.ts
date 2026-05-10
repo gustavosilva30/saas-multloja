@@ -28,8 +28,10 @@ import publicOsRoutes from './routes/publicOs';
 import whatsappRoutes from './routes/whatsapp';
 import { startMaintenanceReminderJob } from './jobs/osMaintenanceReminder';
 import { startBillingReminderJob } from './jobs/billingReminderJob';
+import { startFamilyAgendaJob } from './jobs/familyAgendaJob';
 import eventRoutes from './routes/events';
 import financeRoutes from './routes/finance';
+import familyRoutes from './routes/family';
 
 const app = express();
 
@@ -115,6 +117,7 @@ app.use('/api/public/os', publicOsRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/family', familyRoutes);
 
 // Error handling
 app.use(notFoundHandler);
@@ -137,6 +140,7 @@ async function startServer() {
   // Scheduled jobs
   startMaintenanceReminderJob();
   startBillingReminderJob();
+  startFamilyAgendaJob();
 
   // Initialize MinIO in background — failure won't crash the server
   initializeBucket()

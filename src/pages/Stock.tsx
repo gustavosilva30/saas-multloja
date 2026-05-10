@@ -58,6 +58,7 @@ interface NicheField {
   type: 'text' | 'number' | 'select' | 'multiselect';
   options?: string[];
   placeholder?: string;
+  step?: string; // nome da página (etapa) onde este campo aparece no wizard
 }
 
 interface NicheTemplate {
@@ -118,6 +119,37 @@ function StatusBadge({ status }: { status: 'ok' | 'low' | 'out' }) {
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-500">
       Esgotado
     </span>
+  );
+}
+
+// ── Image Lightbox ────────────────────────────────────────────────────────────
+
+function ImageLightbox({ url, alt, onClose }: { url: string; alt?: string; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', h);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-black/85 z-[60] flex items-center justify-center p-6" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur text-white flex items-center justify-center transition-colors"
+      >
+        <X size={20} />
+      </button>
+      <img
+        src={url}
+        alt={alt ?? ''}
+        onClick={e => e.stopPropagation()}
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+      />
+    </div>
   );
 }
 
@@ -225,10 +257,29 @@ function MultiSelect({
   );
 }
 
-// ── Product Drawer (sectioned with side nav) ──────────────────────────────────
+// ── Product Drawer (paginated wizard) ─────────────────────────────────────────
 
-const SECTIONS = ['general', 'name', 'niche', 'config'] as const;
-type Section = typeof SECTIONS[number];
+interface WizardStep {
+  id: string;
+  label: string;
+  fields?: NicheField[]; // se vazio, é a etapa "Informações Gerais" built-in
+}
+
+function buildSteps(nicheTemplate: NicheTemplate | null): WizardStep[] {
+  const steps: WizardStep[] = [{ id: 'general', label: 'Informações Gerais' }];
+  if (nicheTemplate?.form_schema?.length) {
+    const groups = new Map<string, NicheField[]>();
+    for (const f of nicheTemplate.form_schema) {
+      const stepName = (f.step?.trim()) || nicheTemplate.name || 'Detalhes';
+      if (!groups.has(stepName)) groups.set(stepName, []);
+      groups.get(stepName)!.push(f);
+    }
+    for (const [name, fields] of groups) {
+      steps.push({ id: `niche:${name}`, label: name, fields });
+    }
+  }
+  return steps;
+}
 
 function ProductDrawer({
   product,
@@ -255,10 +306,12 @@ function ProductDrawer({
   } : EMPTY_FORM;
 
   const [form, setForm] = useState<ProductForm>(() => buildForm(product));
-  const [activeSection, setActiveSection] = useState<Section>('general');
-  const sectionRefs = useRef<Record<Section, HTMLDivElement | null>>({ general: null, name: null, niche: null, config: null });
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const steps = buildSteps(nicheTemplate);
+  const [stepIdx, setStepIdx] = useState(0);
+  const currentStep = steps[stepIdx];
+  const isLastStep = stepIdx === steps.length - 1;
   const [nextSku, setNextSku] = useState<string>('');
+  const [imageLightbox, setImageLightbox] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Fetch next sequential SKU when creating a new product
@@ -345,17 +398,8 @@ function ProductDrawer({
   const inputCls = 'w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all';
   const labelCls = 'block text-sm font-medium text-zinc-700 mb-1.5';
 
-  const scrollTo = (sec: Section) => {
-    setActiveSection(sec);
-    sectionRefs.current[sec]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const navItems: { id: Section; label: string }[] = [
-    { id: 'general', label: 'Informações Gerais' },
-    { id: 'name',    label: 'Nome do Produto' },
-    ...(nicheTemplate ? [{ id: 'niche' as Section, label: 'Nicho de Atuação' }] : []),
-    { id: 'config',  label: 'Configurações' },
-  ];
+  const goPrev = () => setStepIdx(i => Math.max(0, i - 1));
+  const goNext = () => setStepIdx(i => Math.min(steps.length - 1, i + 1));
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -371,15 +415,42 @@ function ProductDrawer({
                 <X size={17} />
               </button>
               <h2 className="font-semibold text-zinc-800 text-sm">
-                {product ? 'Edita um Produto' : 'Novo Produto'}
+                {product ? 'Editar Produto' : 'Novo Produto'}
               </h2>
             </div>
-            <button
-              type="submit" disabled={saving}
-              className="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
-            >
-              {saving ? (uploading ? 'Enviando…' : 'Salvando…') : 'Salvar'}
-            </button>
+            <span className="text-xs text-zinc-500">
+              Etapa <span className="font-semibold text-zinc-700">{stepIdx + 1}</span> de {steps.length}
+            </span>
+          </div>
+
+          {/* Step indicator */}
+          <div className="px-5 pt-4 pb-3 bg-white border-b border-zinc-100 shrink-0">
+            <div className="flex items-center gap-2">
+              {steps.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setStepIdx(i)}
+                  className={cn(
+                    'flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium transition-colors',
+                    i === stepIdx
+                      ? 'bg-blue-50 text-blue-700'
+                      : i < stepIdx
+                        ? 'text-emerald-600 hover:bg-zinc-50'
+                        : 'text-zinc-400 hover:bg-zinc-50'
+                  )}
+                >
+                  <span className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                    i === stepIdx ? 'bg-blue-600 text-white' : i < stepIdx ? 'bg-emerald-500 text-white' : 'bg-zinc-200 text-zinc-500'
+                  )}>
+                    {i + 1}
+                  </span>
+                  {s.label}
+                  {i < steps.length - 1 && <ChevronRight size={12} className="text-zinc-300 ml-1" />}
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && (
@@ -388,68 +459,55 @@ function ProductDrawer({
             </div>
           )}
 
-          {/* Body: side nav + content */}
-          <div className="flex-1 flex overflow-hidden min-h-0">
-            {/* Side nav */}
-            <nav className="w-44 shrink-0 px-3 py-4 border-r border-zinc-200 bg-zinc-50">
-              <ul className="space-y-0.5">
-                {navItems.map(item => (
-                  <li key={item.id}>
+          {/* Body: current step content */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
+
+            {/* ── Etapa: Informações Gerais ─────────────────────────── */}
+            {currentStep.id === 'general' && (
+              <section className="bg-white rounded-lg border border-zinc-200 shadow-sm p-6 max-w-2xl mx-auto">
+                <h3 className="text-sm font-semibold text-zinc-800 mb-5">Informações Gerais</h3>
+
+                <div className="flex gap-5 mb-4">
+                  {/* Image upload */}
+                  <div className="shrink-0 space-y-2">
+                    <div
+                      className="w-36 h-36 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center overflow-hidden relative group"
+                    >
+                      {previewUrl ? (
+                        <>
+                          <img
+                            src={previewUrl}
+                            alt=""
+                            onClick={() => setImageLightbox(true)}
+                            className="w-full h-full object-contain cursor-zoom-in"
+                          />
+                        </>
+                      ) : (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-100 transition-colors"
+                        >
+                          <ImageIcon size={26} className="text-zinc-300 mb-1.5" />
+                          <span className="text-xs text-zinc-500">Adicionar imagem</span>
+                        </div>
+                      )}
+                    </div>
                     <button
                       type="button"
-                      onClick={() => scrollTo(item.id)}
-                      className={cn(
-                        'w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors',
-                        activeSection === item.id
-                          ? 'bg-blue-50 text-blue-700 font-medium'
-                          : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800'
-                      )}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-36 px-2 py-1.5 rounded-md border border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 flex items-center justify-center gap-1.5"
                     >
-                      {item.label}
+                      <Upload size={12} /> {previewUrl ? 'Trocar' : 'Enviar imagem'}
                     </button>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-
-            {/* Content */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-
-              {/* ── Card: Informações Gerais ────────────────────────── */}
-              <section
-                ref={el => { sectionRefs.current.general = el; }}
-                className="bg-white rounded-md border border-zinc-200 shadow-sm p-5"
-              >
-                <h3 className="text-sm font-semibold text-zinc-800 mb-4">Informações Gerais</h3>
-
-                <div className="flex gap-5">
-                  {/* Image upload */}
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-32 h-32 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors shrink-0 overflow-hidden relative group"
-                  >
-                    {previewUrl ? (
-                      <>
-                        <img src={previewUrl} alt="" className="w-full h-full object-contain" />
-                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-0.5 text-[11px] text-zinc-600 border-t border-zinc-200 group-hover:bg-blue-50">
-                          Trocar imagem
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <ImageIcon size={24} className="text-zinc-300 mb-1.5" />
-                        <span className="text-xs text-zinc-500">Elige image</span>
-                      </>
-                    )}
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
                   <div className="flex-1 space-y-3">
-                    <div ref={el => { sectionRefs.current.name = el; }}>
+                    <div>
                       <label className={labelCls}>Nome do Produto</label>
                       <input
                         required value={form.name} onChange={set('name')}
-                        placeholder="Pastilha de Freio GSN Pro"
+                        placeholder="Ex: Pastilha de Freio Pro"
                         className={inputCls}
                       />
                     </div>
@@ -460,7 +518,7 @@ function ProductDrawer({
                         <input
                           value={form.metadata.fabricante ?? ''}
                           onChange={e => setMeta('fabricante', e.target.value)}
-                          placeholder="GSN Parts"
+                          placeholder="Marca"
                           className={inputCls}
                         />
                       </div>
@@ -479,100 +537,40 @@ function ProductDrawer({
                         )}
                       </div>
                     </div>
-
-                    <div>
-                      <label className={labelCls}>Descrição</label>
-                      <textarea
-                        value={form.description} onChange={set('description')}
-                        rows={2}
-                        placeholder="Detalhes do produto…"
-                        className={cn(inputCls, 'resize-none')}
-                      />
-                    </div>
                   </div>
                 </div>
-              </section>
 
-              {/* ── Card: Nicho de Atuação ──────────────────────────── */}
-              {nicheTemplate && (
-                <section
-                  ref={el => { sectionRefs.current.niche = el; }}
-                  className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
-                >
-                  <h3 className="text-base font-semibold text-zinc-800 mb-5">
-                    Nicho de Atuação <span className="text-zinc-400 font-normal">({nicheTemplate.name})</span>
-                  </h3>
+                <div>
+                  <label className={labelCls}>Descrição</label>
+                  <textarea
+                    value={form.description} onChange={set('description')}
+                    rows={3}
+                    placeholder="Detalhes do produto…"
+                    className={cn(inputCls, 'resize-none')}
+                  />
+                </div>
 
-                  {nicheTemplate.form_schema.length === 0 ? (
-                    <p className="text-sm text-zinc-400 text-center py-4">Nenhum campo configurado para este nicho.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {nicheTemplate.form_schema.map((field, idx) => {
-                        const isMulti = field.type === 'multiselect';
-                        const isFullWidth = isMulti || idx === nicheTemplate.form_schema.length - 1 && nicheTemplate.form_schema.length % 2 === 1;
-                        return (
-                          <div key={field.key} className={isMulti || isFullWidth ? 'col-span-2' : ''}>
-                            <label className={labelCls}>{field.label}</label>
-                            {field.type === 'select' ? (
-                              <div className="relative">
-                                <select
-                                  value={form.metadata[field.key] ?? ''}
-                                  onChange={e => setMeta(field.key, e.target.value)}
-                                  className={cn(inputCls, 'appearance-none pr-8')}
-                                >
-                                  <option value="">Selecionar…</option>
-                                  {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                                </select>
-                                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-                              </div>
-                            ) : field.type === 'multiselect' ? (
-                              <MultiSelect
-                                value={(form.metadata[field.key] ?? '').split(',').filter(Boolean)}
-                                options={field.options ?? []}
-                                onChange={vs => setMeta(field.key, vs.join(','))}
-                                placeholder={field.placeholder ?? `Buscar a ${field.label.toLowerCase()}…`}
-                              />
-                            ) : (
-                              <input
-                                type={field.type === 'number' ? 'number' : 'text'}
-                                value={form.metadata[field.key] ?? ''}
-                                onChange={e => setMeta(field.key, e.target.value)}
-                                placeholder={field.placeholder ?? ''}
-                                className={inputCls}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {/* ── Card: Configurações ─────────────────────────────── */}
-              <section
-                ref={el => { sectionRefs.current.config = el; }}
-                className="bg-white rounded-md border border-zinc-200 shadow-sm p-5"
-              >
-                <h3 className="text-sm font-semibold text-zinc-800 mb-4">Configurações</h3>
-
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-zinc-100">
                   <div>
                     <label className={labelCls}>
                       SKU
-                      {!product && <span className="text-zinc-400 font-normal"> (automático)</span>}
+                      {!product && <span className="text-zinc-400 font-normal"> (auto)</span>}
                     </label>
                     <input
                       value={form.sku}
                       onChange={set('sku')}
-                      placeholder={!product && nextSku ? `Próximo: ${nextSku}` : 'GSN-001'}
+                      placeholder={!product && nextSku ? nextSku : '01'}
                       className={inputCls}
                       disabled={!!product}
                     />
                   </div>
                   <div>
-                    <label className={labelCls}>Código de Barras</label>
-                    <input value={form.barcode} onChange={set('barcode')} placeholder="7891234567890" className={inputCls} />
+                    <label className={labelCls}>Estoque Inicial</label>
+                    <input
+                      type="number" min="0"
+                      value={form.stock_quantity} onChange={set('stock_quantity')}
+                      className={inputCls}
+                    />
                   </div>
                   <div>
                     <label className={labelCls}>Unidade</label>
@@ -583,33 +581,89 @@ function ProductDrawer({
                       <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
                     </div>
                   </div>
-                  <div className="col-span-2">
-                    <label className={labelCls}>Categoria</label>
-                    <div className="relative">
-                      <select value={form.category_id} onChange={set('category_id')} className={cn(inputCls, 'appearance-none pr-8')}>
-                        <option value="">Sem categoria</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Preço de Custo</label>
-                    <input type="number" step="0.01" min="0" value={form.cost_price} onChange={set('cost_price')} placeholder="0,00" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Estoque Inicial</label>
-                    <input type="number" min="0" value={form.stock_quantity} onChange={set('stock_quantity')} className={inputCls} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={labelCls}>Estoque Mínimo <span className="text-zinc-400 font-normal">(alerta)</span></label>
-                    <input type="number" min="0" value={form.min_stock} onChange={set('min_stock')} className={inputCls} />
-                  </div>
                 </div>
               </section>
-            </div>
+            )}
+
+            {/* ── Etapa: Nicho (página customizada) ─────────────────── */}
+            {currentStep.fields && (
+              <section className="bg-white rounded-lg border border-zinc-200 shadow-sm p-6 max-w-2xl mx-auto">
+                <h3 className="text-sm font-semibold text-zinc-800 mb-5">{currentStep.label}</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {currentStep.fields.map(field => {
+                    const isMulti = field.type === 'multiselect';
+                    return (
+                      <div key={field.key} className={isMulti ? 'col-span-2' : ''}>
+                        <label className={labelCls}>{field.label}</label>
+                        {field.type === 'select' ? (
+                          <div className="relative">
+                            <select
+                              value={form.metadata[field.key] ?? ''}
+                              onChange={e => setMeta(field.key, e.target.value)}
+                              className={cn(inputCls, 'appearance-none pr-8')}
+                            >
+                              <option value="">Selecionar…</option>
+                              {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                          </div>
+                        ) : isMulti ? (
+                          <MultiSelect
+                            value={(form.metadata[field.key] ?? '').split(',').filter(Boolean)}
+                            options={field.options ?? []}
+                            onChange={vs => setMeta(field.key, vs.join(','))}
+                            placeholder={field.placeholder ?? `Buscar ${field.label.toLowerCase()}…`}
+                          />
+                        ) : (
+                          <input
+                            type={field.type === 'number' ? 'number' : 'text'}
+                            value={form.metadata[field.key] ?? ''}
+                            onChange={e => setMeta(field.key, e.target.value)}
+                            placeholder={field.placeholder ?? ''}
+                            className={inputCls}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* Footer with wizard controls */}
+          <div className="px-5 py-3 border-t border-zinc-200 bg-white flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={stepIdx === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={14} /> Voltar
+            </button>
+
+            {isLastStep ? (
+              <button
+                type="submit" disabled={saving}
+                className="px-5 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {saving ? (uploading ? 'Enviando…' : 'Salvando…') : 'Salvar Produto'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={goNext}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors shadow-sm"
+              >
+                Próximo <ChevronRight size={14} />
+              </button>
+            )}
           </div>
         </form>
+
+        {imageLightbox && previewUrl && (
+          <ImageLightbox url={previewUrl} alt={form.name} onClose={() => setImageLightbox(false)} />
+        )}
       </div>
     </div>
   );
@@ -818,6 +872,7 @@ export function Stock() {
 
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [view, setView] = useState<'list' | 'grid'>(() => (localStorage.getItem('stock_view') as 'list' | 'grid') || 'list');
+  const [lightbox, setLightbox] = useState<{ url: string; alt?: string } | null>(null);
 
   useEffect(() => { localStorage.setItem('stock_view', view); }, [view]);
 
@@ -932,7 +987,12 @@ export function Stock() {
                 {/* Image area */}
                 <div className="relative bg-zinc-50 aspect-square">
                   {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} className="w-full h-full object-contain" />
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      onClick={e => { e.stopPropagation(); setLightbox({ url: p.image_url!, alt: p.name }); }}
+                      className="w-full h-full object-contain cursor-zoom-in"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Package size={36} className="text-zinc-300" />
@@ -1017,7 +1077,13 @@ export function Stock() {
                     />
                   </td>
                   <td className="px-2 py-2 border-b border-zinc-100">
-                    <div className="w-9 h-9 rounded-md overflow-hidden bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0">
+                    <div
+                      onClick={() => p.image_url && setLightbox({ url: p.image_url, alt: p.name })}
+                      className={cn(
+                        'w-9 h-9 rounded-md overflow-hidden bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0',
+                        p.image_url && 'cursor-zoom-in hover:ring-2 hover:ring-emerald-300'
+                      )}
+                    >
                       {p.image_url
                         ? <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                         : <Package size={16} className="text-zinc-300" />
@@ -1121,6 +1187,9 @@ export function Stock() {
           onClose={() => setAdjustTarget(null)}
           onSave={load}
         />
+      )}
+      {lightbox && (
+        <ImageLightbox url={lightbox.url} alt={lightbox.alt} onClose={() => setLightbox(null)} />
       )}
     </div>
   );

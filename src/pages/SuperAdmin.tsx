@@ -279,6 +279,7 @@ interface FormField {
   type: 'text' | 'number' | 'textarea' | 'select';
   options?: string[];
   required: boolean;
+  step?: string; // nome da página/etapa onde o campo aparece no wizard de produto
 }
 
 interface NicheTemplate {
@@ -371,6 +372,18 @@ function FieldEditor({ field, onChange, onRemove }: {
               />
               Obrigatório
             </label>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Página (etapa do wizard)
+              <span className="text-gray-400 font-normal ml-1">— campos com mesmo nome aparecem juntos</span>
+            </label>
+            <input
+              value={field.step ?? ''}
+              onChange={e => onChange({ ...field, step: e.target.value })}
+              placeholder="Ex: Compatibilidade, Especificações, Detalhes…"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 dark:text-white"
+            />
           </div>
           {field.type === 'select' && (
             <div className="col-span-2">

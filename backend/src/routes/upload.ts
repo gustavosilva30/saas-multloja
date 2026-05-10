@@ -1,13 +1,75 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
+import multer from 'multer';
+import sharp from 'sharp';
 import { authenticateToken } from '../middleware/auth';
-import { getPresignedUploadUrl, getPresignedDownloadUrl, BUCKET_NAME } from '../config/minio';
+import { getPresignedUploadUrl, getPresignedDownloadUrl, BUCKET_NAME, minioClient } from '../config/minio';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// Multer: 10MB max, memory storage (we re-encode with sharp before uploading)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+// Build a public URL for an object stored in MinIO.
+// Prefers MINIO_PUBLIC_URL if set (e.g. https://cdn.example.com), otherwise
+// reconstructs from MINIO_ENDPOINT/PORT/USE_SSL with path-style addressing.
+function buildPublicUrl(objectName: string): string {
+  const base = process.env.MINIO_PUBLIC_URL?.replace(/\/$/, '');
+  if (base) return `${base}/${BUCKET_NAME}/${objectName}`;
+  const proto = process.env.MINIO_USE_SSL === 'true' ? 'https' : 'http';
+  const host = process.env.MINIO_ENDPOINT || 'localhost';
+  const port = process.env.MINIO_PORT || '9000';
+  const portSuffix = (proto === 'https' && port === '443') || (proto === 'http' && port === '80') ? '' : `:${port}`;
+  return `${proto}://${host}${portSuffix}/${BUCKET_NAME}/${objectName}`;
+}
+
+// POST /api/upload — multipart upload with image compression.
+// Resizes images larger than 1600px on the long edge and re-encodes as
+// webp (quality 82) — typically 70-90% smaller than the original JPEG/PNG
+// while keeping visual quality.
+router.post('/', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) { res.status(400).json({ error: 'No file uploaded' }); return; }
+
+    const tenantId = req.user!.tenant_id;
+    const isImage = req.file.mimetype.startsWith('image/');
+
+    let buffer: Buffer = req.file.buffer;
+    let contentType = req.file.mimetype;
+    let extension = req.file.originalname.split('.').pop()?.toLowerCase() || 'bin';
+
+    if (isImage && req.file.mimetype !== 'image/svg+xml' && req.file.mimetype !== 'image/gif') {
+      // Compress + resize while preserving aspect ratio
+      buffer = await sharp(req.file.buffer)
+        .rotate() // honor EXIF orientation
+        .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+      contentType = 'image/webp';
+      extension = 'webp';
+    }
+
+    const objectName = `tenants/${tenantId}/products/${uuidv4()}.${extension}`;
+
+    await minioClient.putObject(BUCKET_NAME, objectName, buffer, buffer.length, {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+
+    const url = buildPublicUrl(objectName);
+    res.json({ url, objectName, size: buffer.length, contentType });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Failed to upload file' });
+  }
+});
 
 // Generate presigned URL for file upload
 router.post(

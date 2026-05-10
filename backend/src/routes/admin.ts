@@ -136,6 +136,99 @@ router.post('/tenants/:id/toggle', adminAuth, async (req: Request, res: Response
   }
 });
 
+// ── GET /api/admin/niches ─────────────────────────────────────────────────────
+router.get('/niches', adminAuth, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(
+      `SELECT id, name, slug, description, form_schema, is_active, sort_order, created_at
+       FROM niche_templates ORDER BY sort_order, name`
+    );
+    res.json({ niches: result.rows });
+  } catch (err) {
+    console.error('Admin niches error:', err);
+    res.status(500).json({ error: 'Failed to list niches' });
+  }
+});
+
+// ── POST /api/admin/niches ────────────────────────────────────────────────────
+router.post('/niches',
+  adminAuth,
+  [
+    body('name').notEmpty().withMessage('name is required'),
+    body('slug').matches(/^[a-z0-9_]+$/).withMessage('slug: only lowercase, numbers and underscores'),
+    body('form_schema').isArray().withMessage('form_schema must be an array'),
+  ],
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
+
+      const { name, slug, description, form_schema, sort_order } = req.body;
+      const result = await query(`
+        INSERT INTO niche_templates (name, slug, description, form_schema, sort_order)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+      `, [name, slug, description ?? '', JSON.stringify(form_schema), sort_order ?? 0]);
+
+      res.status(201).json(result.rows[0]);
+    } catch (err: any) {
+      if (err.code === '23505') { res.status(409).json({ error: 'Slug já existe' }); return; }
+      console.error('Admin create niche error:', err);
+      res.status(500).json({ error: 'Failed to create niche' });
+    }
+  }
+);
+
+// ── PUT /api/admin/niches/:id ─────────────────────────────────────────────────
+router.put('/niches/:id', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, slug, description, form_schema, is_active, sort_order } = req.body;
+    const result = await query(`
+      UPDATE niche_templates SET
+        name        = COALESCE($1, name),
+        slug        = COALESCE($2, slug),
+        description = COALESCE($3, description),
+        form_schema = COALESCE($4, form_schema),
+        is_active   = COALESCE($5, is_active),
+        sort_order  = COALESCE($6, sort_order),
+        updated_at  = NOW()
+      WHERE id = $7
+      RETURNING *
+    `, [
+      name ?? null,
+      slug ?? null,
+      description ?? null,
+      form_schema ? JSON.stringify(form_schema) : null,
+      is_active ?? null,
+      sort_order ?? null,
+      id,
+    ]);
+    if (!result.rows[0]) { res.status(404).json({ error: 'Niche not found' }); return; }
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    if (err.code === '23505') { res.status(409).json({ error: 'Slug já existe' }); return; }
+    console.error('Admin update niche error:', err);
+    res.status(500).json({ error: 'Failed to update niche' });
+  }
+});
+
+// ── DELETE /api/admin/niches/:id ──────────────────────────────────────────────
+router.delete('/niches/:id', adminAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Soft delete: just deactivate
+    const result = await query(
+      `UPDATE niche_templates SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING id, name`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) { res.status(404).json({ error: 'Niche not found' }); return; }
+    res.json({ ok: true, ...result.rows[0] });
+  } catch (err) {
+    console.error('Admin delete niche error:', err);
+    res.status(500).json({ error: 'Failed to delete niche' });
+  }
+});
+
 // ── GET /api/admin/modules ────────────────────────────────────────────────────
 router.get('/modules', adminAuth, async (_req: Request, res: Response): Promise<void> => {
   try {

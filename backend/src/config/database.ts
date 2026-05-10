@@ -112,6 +112,77 @@ export async function runMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_module_catalog_is_active ON module_catalog(is_active)
     `);
 
+    // ── Niche templates ──────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS niche_templates (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name        VARCHAR(100) NOT NULL,
+        slug        VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        form_schema JSONB NOT NULL DEFAULT '[]',
+        is_active   BOOLEAN NOT NULL DEFAULT true,
+        sort_order  INTEGER DEFAULT 0,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_niche_templates_slug ON niche_templates(slug)
+    `);
+
+    // Add niche_id FK to tenants (may already exist — IF NOT EXISTS handles it)
+    await client.query(`
+      ALTER TABLE tenants
+        ADD COLUMN IF NOT EXISTS niche_template_id UUID REFERENCES niche_templates(id) ON DELETE SET NULL
+    `);
+
+    // Ensure products.metadata JSONB column exists
+    await client.query(`
+      ALTER TABLE products
+        ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'
+    `);
+
+    // Seed: default niche templates
+    await client.query(`
+      INSERT INTO niche_templates (name, slug, description, form_schema, sort_order) VALUES
+      ('Auto Peças', 'auto_pecas', 'Lojas de peças automotivas e acessórios', '[
+        {"name":"codigo_oem","label":"Código OEM","type":"text","required":false},
+        {"name":"marca_veiculo","label":"Marca do Veículo","type":"text","required":false},
+        {"name":"modelo_veiculo","label":"Modelo do Veículo","type":"text","required":false},
+        {"name":"ano_inicial","label":"Ano Inicial","type":"number","required":false},
+        {"name":"ano_final","label":"Ano Final","type":"number","required":false},
+        {"name":"posicao_montagem","label":"Posição de Montagem","type":"text","required":false}
+      ]'::jsonb, 1),
+      ('Barbearia / Salão', 'barbearia', 'Serviços de corte, barba e estética', '[
+        {"name":"tempo_estimado","label":"Tempo Estimado (min)","type":"number","required":false},
+        {"name":"tipo_servico","label":"Tipo de Serviço","type":"select","options":["Corte","Barba","Sobrancelha","Coloração","Manicure"],"required":false},
+        {"name":"profissional","label":"Profissional Responsável","type":"text","required":false}
+      ]'::jsonb, 2),
+      ('Vestuário', 'vestuario', 'Roupas, calçados e acessórios de moda', '[
+        {"name":"tamanho","label":"Tamanho","type":"select","options":["PP","P","M","G","GG","XGG"],"required":false},
+        {"name":"cor","label":"Cor","type":"text","required":false},
+        {"name":"material","label":"Material / Tecido","type":"text","required":false},
+        {"name":"genero","label":"Gênero","type":"select","options":["Masculino","Feminino","Unissex","Infantil"],"required":false}
+      ]'::jsonb, 3),
+      ('Restaurante / Lanchonete', 'restaurante', 'Alimentação, delivery e cardápio digital', '[
+        {"name":"ingredientes","label":"Ingredientes","type":"textarea","required":false},
+        {"name":"calorias","label":"Calorias (kcal)","type":"number","required":false},
+        {"name":"alergenos","label":"Alérgenos","type":"text","required":false},
+        {"name":"tempo_preparo","label":"Tempo de Preparo (min)","type":"number","required":false},
+        {"name":"vegano","label":"Vegano","type":"select","options":["Sim","Não"],"required":false}
+      ]'::jsonb, 4),
+      ('Farmácia / Saúde', 'farmacia', 'Medicamentos, cosméticos e suplementos', '[
+        {"name":"principio_ativo","label":"Princípio Ativo","type":"text","required":false},
+        {"name":"dosagem","label":"Dosagem","type":"text","required":false},
+        {"name":"laboratorio","label":"Laboratório","type":"text","required":false},
+        {"name":"registro_anvisa","label":"Registro ANVISA","type":"text","required":false},
+        {"name":"requer_receita","label":"Requer Receita","type":"select","options":["Sim","Não"],"required":false}
+      ]'::jsonb, 5),
+      ('Varejo Geral', 'varejo_geral', 'Lojas de produtos variados sem campo específico', '[]'::jsonb, 6)
+      ON CONFLICT (slug) DO NOTHING
+    `);
+
     console.log('✅ Database migrations applied');
   } catch (err) {
     console.error('❌ Migration error:', err);

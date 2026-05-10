@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, MouseEvent } from 'react';
-import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X, Tag, Save, Loader2, Sun, Moon, Monitor } from 'lucide-react';
+import { Building2, Users, Package, TrendingUp, LogOut, ChevronRight, ToggleLeft, ToggleRight, X, Tag, Save, Loader2, Sun, Moon, Monitor, Layers, Plus, Trash2, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
@@ -271,10 +271,360 @@ function ModulePricing({ token }: { token: string }) {
   );
 }
 
+// ── Niche Manager ────────────────────────────────────────────────────────────
+
+interface FormField {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'textarea' | 'select';
+  options?: string[];
+  required: boolean;
+}
+
+interface NicheTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  form_schema: FormField[];
+  is_active: boolean;
+  sort_order: number;
+}
+
+const FIELD_TYPES = [
+  { value: 'text', label: 'Texto' },
+  { value: 'number', label: 'Número' },
+  { value: 'textarea', label: 'Texto longo' },
+  { value: 'select', label: 'Lista (select)' },
+];
+
+function toSlug(s: string) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function FieldEditor({ field, onChange, onRemove }: {
+  key?: string | number;
+  field: FormField;
+  onChange: (f: FormField) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 cursor-pointer"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-2">
+          <GripVertical size={14} className="text-gray-400" />
+          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+            {field.label || '(sem label)'} <span className="text-gray-400 font-normal">· {field.type}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={e => { e.stopPropagation(); onRemove(); }} className="text-red-400 hover:text-red-600 p-1">
+            <Trash2 size={14} />
+          </button>
+          {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+        </div>
+      </div>
+
+      {open && (
+        <div className="p-4 grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Label *</label>
+            <input
+              value={field.label}
+              onChange={e => onChange({ ...field, label: e.target.value })}
+              placeholder="Ex: Código OEM"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Name (chave) *</label>
+            <input
+              value={field.name}
+              onChange={e => onChange({ ...field, name: toSlug(e.target.value) })}
+              placeholder="Ex: codigo_oem"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-violet-500 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+            <select
+              value={field.type}
+              onChange={e => onChange({ ...field, type: e.target.value as FormField['type'] })}
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 dark:text-white"
+            >
+              {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={field.required}
+                onChange={e => onChange({ ...field, required: e.target.checked })}
+                className="accent-violet-500"
+              />
+              Obrigatório
+            </label>
+          </div>
+          {field.type === 'select' && (
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                Opções (uma por linha)
+              </label>
+              <textarea
+                rows={3}
+                value={(field.options ?? []).join('\n')}
+                onChange={e => onChange({ ...field, options: e.target.value.split('\n').map(o => o.trim()).filter(Boolean) })}
+                placeholder="Opção 1&#10;Opção 2&#10;Opção 3"
+                className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 dark:text-white resize-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NicheForm({
+  initial,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  initial?: NicheTemplate;
+  onSave: (data: Partial<NicheTemplate>) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [slug, setSlug] = useState(initial?.slug ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [fields, setFields] = useState<FormField[]>(initial?.form_schema ?? []);
+  const [slugEdited, setSlugEdited] = useState(!!initial);
+
+  const handleNameChange = (v: string) => {
+    setName(v);
+    if (!slugEdited) setSlug(toSlug(v));
+  };
+
+  const addField = () => setFields(f => [...f, { name: '', label: '', type: 'text', required: false }]);
+  const removeField = (i: number) => setFields(f => f.filter((_, idx) => idx !== i));
+  const updateField = (i: number, f: FormField) => setFields(prev => prev.map((p, idx): FormField => idx === i ? f : p));
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-5">
+      <h3 className="font-bold text-gray-900 dark:text-white">
+        {initial ? 'Editar Nicho' : 'Novo Nicho'}
+      </h3>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nome *</label>
+          <input
+            value={name} onChange={e => handleNameChange(e.target.value)}
+            placeholder="Ex: Auto Peças"
+            className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Slug (chave única) *</label>
+          <input
+            value={slug}
+            onChange={e => { setSlug(toSlug(e.target.value)); setSlugEdited(true); }}
+            placeholder="auto_pecas"
+            className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-violet-500 dark:text-white"
+          />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Descrição</label>
+          <input
+            value={description} onChange={e => setDescription(e.target.value)}
+            placeholder="Breve descrição do nicho"
+            className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Fields builder */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Campos Dinâmicos de Produto ({fields.length})
+          </h4>
+          <button
+            onClick={addField}
+            className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Plus size={13} /> Adicionar campo
+          </button>
+        </div>
+        {fields.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+            Nenhum campo dinâmico. Clique em "Adicionar campo" para começar.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {fields.map((f: FormField, i: number) => (
+              <FieldEditor
+                key={i}
+                field={f}
+                onChange={(nf: FormField) => { updateField(i, nf); }}
+                onRemove={() => { removeField(i); }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-200 dark:border-gray-800">
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button
+          onClick={() => onSave({ name, slug, description, form_schema: fields })}
+          disabled={!name || !slug || saving}
+          className="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {initial ? 'Salvar alterações' : 'Criar nicho'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NicheManager({ token }: { token: string }) {
+  const [niches, setNiches] = useState<NicheTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<NicheTemplate | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    adminFetch<{ niches: NicheTemplate[] }>('/niches', token)
+      .then(d => setNiches(d.niches))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [token]);
+
+  const handleCreate = async (data: Partial<NicheTemplate>) => {
+    setSaving(true);
+    try {
+      await adminFetch('/niches', token, { method: 'POST', body: JSON.stringify(data) });
+      setCreating(false);
+      load();
+    } catch (e: any) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleUpdate = async (data: Partial<NicheTemplate>) => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await adminFetch(`/niches/${editing.id}`, token, { method: 'PUT', body: JSON.stringify(data) });
+      setEditing(null);
+      load();
+    } catch (e: any) { alert(e.message); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Desativar o nicho "${name}"? As empresas vinculadas não serão afetadas.`)) return;
+    await adminFetch(`/niches/${id}`, token, { method: 'DELETE' });
+    load();
+  };
+
+  if (creating) return <NicheForm onSave={handleCreate} onCancel={() => setCreating(false)} saving={saving} />;
+  if (editing) return <NicheForm initial={editing} onSave={handleUpdate} onCancel={() => setEditing(null)} saving={saving} />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-bold text-gray-900 dark:text-white">Templates de Nicho</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Defina campos dinâmicos que aparecem nos produtos de cada tipo de negócio</p>
+        </div>
+        <button
+          onClick={() => setCreating(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          <Plus size={15} /> Novo Nicho
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {niches.map(n => (
+            <div key={n.id} className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900 dark:text-white">{n.name}</h3>
+                    {!n.is_active && (
+                      <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Inativo</span>
+                    )}
+                  </div>
+                  <p className="text-xs font-mono text-gray-400 mt-0.5">{n.slug}</p>
+                  {n.description && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{n.description}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setEditing(n)}
+                    className="p-1.5 text-gray-400 hover:text-violet-600 transition-colors"
+                    title="Editar"
+                  >
+                    <Save size={15} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(n.id, n.name)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Desativar"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+
+              {n.form_schema.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Sem campos dinâmicos</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {n.form_schema.map(f => (
+                    <span key={f.name} className="text-xs bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-700">
+                      {f.label}
+                      <span className="ml-1 text-violet-400">·{f.type}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {niches.length === 0 && (
+            <p className="col-span-2 text-center text-gray-400 py-12">Nenhum nicho cadastrado ainda</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
-  const [tab, setTab] = useState<'tenants' | 'modules'>('tenants');
+  const [tab, setTab] = useState<'tenants' | 'modules' | 'niches'>('tenants');
   const [stats, setStats] = useState<Stats | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [selected, setSelected] = useState<TenantDetail | null>(null);
@@ -383,9 +733,16 @@ function AdminDashboard({ token, onLogout }: { token: string; onLogout: () => vo
           >
             <Tag size={15} /> Preços dos Módulos
           </button>
+          <button
+            onClick={() => setTab('niches')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${tab === 'niches' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white border border-b-0 border-gray-300 dark:border-gray-800' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+          >
+            <Layers size={15} /> Nichos
+          </button>
         </div>
 
         {tab === 'modules' && <ModulePricing token={token} />}
+        {tab === 'niches' && <NicheManager token={token} />}
 
         {tab === 'tenants' && <>
         {/* Stats */}

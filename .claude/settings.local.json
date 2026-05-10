@@ -18,7 +18,9 @@
       "Bash(npx vite *)",
       "PowerShell(Invoke-RestMethod -Uri \"https://api.gsntech.com.br/api/admin/seed\" -Method POST -ContentType \"application/json\" -Body '{\"email\":\"guga.b.139935@gmail.com\",\"password\":\"admin123456\",\"full_name\":\"Gustavo\"}')",
       "Bash(node -e \"require\\('axios'\\); console.log\\('ok'\\)\")",
-      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('react:', p.dependencies.react, 'typescript:', p.devDependencies?.typescript\\)\")"
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('react:', p.dependencies.react, 'typescript:', p.devDependencies?.typescript\\)\")",
+      "Bash(xargs grep -l \"payment_method\\\\|sales\")",
+      "Bash(xargs grep -l \"IMAGENS DO PRODUTO\\\\|product.*wizard\\\\|ProductWizard\\\\|EditProduct\\\\|NewProduct\")"
     ]
   }
 }

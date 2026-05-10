@@ -512,152 +512,102 @@ function ProductDrawer({
 
             {/* ── Etapa: Informações Gerais ─────────────────────────── */}
             {currentStep.id === 'general' && (
-              <section className="bg-white rounded-lg border border-zinc-200 shadow-sm p-6 max-w-2xl mx-auto">
-                <h3 className="text-sm font-semibold text-zinc-800 mb-5">Informações Gerais</h3>
+              <section className="bg-white rounded-lg border border-zinc-200 shadow-sm p-5 max-w-3xl mx-auto">
+                <h3 className="text-sm font-semibold text-zinc-800 mb-4">Informações Gerais</h3>
 
-                <div className="flex gap-5 mb-4">
-                  {/* Images upload - up to 10 images */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                        Imagens do Produto ({images.length}/10)
-                      </label>
+                {/* Two-column layout: image manager (left) + fields (right) */}
+                <div className="grid grid-cols-[160px_1fr] gap-5 mb-4">
+
+                  {/* ── Image manager ── */}
+                  <div className="flex flex-col gap-2">
+                    {/* Main preview */}
+                    <div
+                      className={cn(
+                        'relative w-full aspect-square rounded-lg overflow-hidden border-2 bg-zinc-50 flex items-center justify-center cursor-pointer',
+                        images.length > 0 ? 'border-zinc-200' : 'border-dashed border-zinc-300 hover:border-emerald-400'
+                      )}
+                      onClick={() => images.length === 0 && fileInputRef.current?.click()}
+                    >
+                      {images.length > 0 ? (
+                        <>
+                          <img
+                            src={images.find(i => i.is_primary)?.image_url ?? images[0].image_url}
+                            alt="Principal"
+                            className="w-full h-full object-contain"
+                          />
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded">
+                            PRINCIPAL
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1.5 text-zinc-400 px-3 text-center">
+                          <ImageIcon size={22} />
+                          <span className="text-[10px] leading-tight">Clique para adicionar</span>
+                        </div>
+                      )}
+                      {uploadingImages.length > 0 && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <RefreshCw size={18} className="text-white animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Thumbnails strip */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {images.map((img, index) => (
+                        <div
+                          key={img.id || index}
+                          className={cn(
+                            'relative w-10 h-10 rounded-md overflow-hidden border-2 cursor-pointer shrink-0 group',
+                            img.is_primary ? 'border-emerald-500' : 'border-zinc-200 hover:border-zinc-400'
+                          )}
+                          onClick={() => setPrimaryImage(index)}
+                          title={img.is_primary ? 'Imagem principal' : 'Definir como principal'}
+                        >
+                          <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); removeImage(index); }}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          >
+                            <X size={12} className="text-white" />
+                          </button>
+                        </div>
+                      ))}
                       {images.length < 10 && (
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                          className="w-10 h-10 rounded-md border-2 border-dashed border-zinc-300 hover:border-emerald-400 bg-zinc-50 flex items-center justify-center shrink-0 transition-colors"
+                          title="Adicionar imagem"
                         >
-                          <Upload size={12} /> Adicionar
+                          <Plus size={14} className="text-zinc-400" />
                         </button>
                       )}
                     </div>
 
-                    {/* Images grid */}
-                    {images.length > 0 ? (
-                      <div className="grid grid-cols-5 gap-2">
-                        {images.map((img, index) => (
-                          <div
-                            key={img.id || index}
-                            className={cn(
-                              "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
-                              img.is_primary ? "border-emerald-500 ring-2 ring-emerald-100" : "border-zinc-200 dark:border-zinc-700"
-                            )}
-                          >
-                            <img
-                              src={img.image_url}
-                              alt={`Imagem ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-
-                            {/* Uploading overlay */}
-                            {uploadingImages.includes(img.id || '') && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <RefreshCw size={16} className="text-white animate-spin" />
-                              </div>
-                            )}
-
-                            {/* Hover actions */}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                              {!img.is_primary && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPrimaryImage(index)}
-                                  className="px-2 py-1 bg-white rounded text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-                                >
-                                  Principal
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index)}
-                                className="px-2 py-1 bg-red-500 rounded text-xs font-medium text-white hover:bg-red-600"
-                              >
-                                Remover
-                              </button>
-                            </div>
-
-                            {/* Primary badge */}
-                            {img.is_primary && (
-                              <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded">
-                                PRINCIPAL
-                              </div>
-                            )}
-                          </div>
-                        ))}
-
-                        {/* Add more button (if under limit) */}
-                        {images.length < 10 && (
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center transition-colors"
-                          >
-                            <Plus size={20} className="text-zinc-400" />
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      /* Empty state upload area */
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-32 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-zinc-50 dark:bg-zinc-800/50 flex flex-col items-center justify-center gap-2 transition-colors"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                          <ImageIcon size={20} className="text-zinc-500 dark:text-zinc-400" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Clique para adicionar imagens</p>
-                          <p className="text-xs text-zinc-400">Máximo 10 imagens (JPG, PNG, GIF até 5MB)</p>
-                        </div>
-                      </button>
-                    )}
-
-                    {/* Hidden file input - multiple */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-
-                    <p className="text-xs text-zinc-400">
-                      A primeira imagem é definida como principal automaticamente. Passe o mouse sobre uma imagem para defini-la como principal ou removê-la.
+                    <p className="text-[10px] text-zinc-400 leading-tight">
+                      {images.length}/10 imagens · Clique na miniatura para definir como principal
                     </p>
+
+                    <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
                   </div>
 
-                  {/* Form fields */}
-                  <div className="flex-1 space-y-4">
+                  {/* ── Form fields ── */}
+                  <div className="space-y-3">
                     <div>
                       <label className={labelCls}>Nome do produto *</label>
-                      <input
-                        value={form.name} onChange={set('name')}
-                        placeholder="Ex: Camisa Polo Azul"
-                        className={inputCls}
-                      />
+                      <input value={form.name} onChange={set('name')} placeholder="Ex: Camisa Polo Azul" className={inputCls} />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Preço de venda *</label>
-                        <input
-                          type="number" step="0.01" min="0"
-                          value={form.sale_price} onChange={set('sale_price')}
-                          placeholder="0,00"
-                          className={inputCls}
-                        />
+                        <input type="number" step="0.01" min="0" value={form.sale_price} onChange={set('sale_price')} placeholder="0,00" className={inputCls} />
                       </div>
                       <div>
                         <label className={labelCls}>Preço de custo</label>
-                        <input
-                          type="number" step="0.01" min="0"
-                          value={form.cost_price} onChange={set('cost_price')}
-                          placeholder="0,00"
-                          className={inputCls}
-                        />
+                        <input type="number" step="0.01" min="0" value={form.cost_price} onChange={set('cost_price')} placeholder="0,00" className={inputCls} />
                         {margin !== null && (
                           <p className={cn('text-[11px] mt-0.5', parseFloat(margin) >= 0 ? 'text-emerald-600' : 'text-red-500')}>
                             Margem: {margin}%
@@ -665,50 +615,33 @@ function ProductDrawer({
                         )}
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div>
-                  <label className={labelCls}>Descrição</label>
-                  <textarea
-                    value={form.description} onChange={set('description')}
-                    rows={3}
-                    placeholder="Detalhes do produto…"
-                    className={cn(inputCls, 'resize-none')}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-zinc-100">
-                  <div>
-                    <label className={labelCls}>
-                      SKU
-                      {!product && <span className="text-zinc-400 font-normal"> (auto)</span>}
-                    </label>
-                    <input
-                      value={form.sku}
-                      onChange={set('sku')}
-                      placeholder={!product && nextSku ? nextSku : '01'}
-                      className={inputCls}
-                      disabled={!!product}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Estoque Inicial</label>
-                    <input
-                      type="number" min="0"
-                      value={form.stock_quantity} onChange={set('stock_quantity')}
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Unidade</label>
-                    <div className="relative">
-                      <select value={form.unit} onChange={set('unit')} className={cn(inputCls, 'appearance-none pr-8')}>
-                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className={labelCls}>SKU{!product && <span className="text-zinc-400 font-normal"> (auto)</span>}</label>
+                        <input value={form.sku} onChange={set('sku')} placeholder={!product && nextSku ? nextSku : '01'} className={inputCls} disabled={!!product} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Estoque</label>
+                        <input type="number" min="0" value={form.stock_quantity} onChange={set('stock_quantity')} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Unidade</label>
+                        <div className="relative">
+                          <select value={form.unit} onChange={set('unit')} className={cn(inputCls, 'appearance-none pr-8')}>
+                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Description — full width below */}
+                <div>
+                  <label className={labelCls}>Descrição</label>
+                  <textarea value={form.description} onChange={set('description')} rows={2} placeholder="Detalhes do produto…" className={cn(inputCls, 'resize-none')} />
                 </div>
               </section>
             )}
@@ -775,7 +708,7 @@ function ProductDrawer({
                 type="submit" disabled={saving}
                 className="px-5 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
               >
-                {saving ? (uploading ? 'Enviando…' : 'Salvando…') : 'Salvar Produto'}
+                {saving ? (uploadingImages.length > 0 ? 'Enviando…' : 'Salvando…') : 'Salvar Produto'}
               </button>
             ) : (
               <button
@@ -789,8 +722,12 @@ function ProductDrawer({
           </div>
         </form>
 
-        {imageLightbox && previewUrl && (
-          <ImageLightbox url={previewUrl} alt={form.name} onClose={() => setImageLightbox(false)} />
+        {imageLightbox && images.length > 0 && (
+          <ImageLightbox
+            url={images.find(i => i.is_primary)?.image_url ?? images[0].image_url}
+            alt={form.name}
+            onClose={() => setImageLightbox(false)}
+          />
         )}
       </div>
     </div>

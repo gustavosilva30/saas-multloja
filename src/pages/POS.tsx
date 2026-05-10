@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import {
   Search, Plus, Minus, Trash2, X, ShoppingCart, Package,
   CreditCard, Banknote, QrCode, Receipt, User, Check,
-  AlertCircle, Percent,
+  AlertCircle, Barcode, FileCheck2, Wallet, FileBadge,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,12 +43,17 @@ interface CartItem {
   quantity: number;
 }
 
-type PaymentMethod = 'cash' | 'card' | 'pix';
+type PaymentMethod = 'cash' | 'debit_card' | 'credit_card' | 'pix' | 'boleto' | 'cheque' | 'customer_credit' | 'internal_credit';
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: typeof CreditCard }[] = [
-  { id: 'cash', label: 'Dinheiro', icon: Banknote },
-  { id: 'card', label: 'Cartão',   icon: CreditCard },
-  { id: 'pix',  label: 'Pix',      icon: QrCode },
+const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: typeof CreditCard; needsCustomer?: true }[] = [
+  { id: 'cash',            label: 'Dinheiro',        icon: Banknote },
+  { id: 'debit_card',      label: 'Déb. Cartão',     icon: CreditCard },
+  { id: 'credit_card',     label: 'Créd. Cartão',    icon: CreditCard },
+  { id: 'pix',             label: 'Pix',             icon: QrCode },
+  { id: 'boleto',          label: 'Boleto',          icon: Barcode },
+  { id: 'cheque',          label: 'Cheque',          icon: FileCheck2 },
+  { id: 'customer_credit', label: 'Haver Cliente',   icon: Wallet,    needsCustomer: true },
+  { id: 'internal_credit', label: 'Nota Créd.',      icon: FileBadge },
 ];
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -212,6 +217,9 @@ export function POS() {
   const finalize = async (e: FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
+    if (paymentMethod === 'customer_credit' && !customer) {
+      setError('Selecione um cliente para usar Haver Cliente'); return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -441,23 +449,28 @@ export function POS() {
             {/* Payment method */}
             <div>
               <p className="text-xs font-medium text-zinc-600 mb-1.5">Forma de Pagamento</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {PAYMENT_METHODS.map(m => (
                   <button
                     key={m.id} type="button"
                     onClick={() => setPaymentMethod(m.id)}
                     className={cn(
-                      'flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-colors',
+                      'flex flex-col items-center gap-1 py-2 px-1 rounded-lg border text-[10px] font-medium transition-colors leading-tight',
                       paymentMethod === m.id
                         ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
                         : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
                     )}
                   >
-                    <m.icon size={16} />
-                    {m.label}
+                    <m.icon size={14} />
+                    <span className="text-center">{m.label}</span>
                   </button>
                 ))}
               </div>
+              {paymentMethod === 'customer_credit' && !customer && (
+                <p className="text-[10px] text-amber-600 mt-1.5 flex items-center gap-1">
+                  <AlertCircle size={10} /> Selecione um cliente para usar Haver Cliente
+                </p>
+              )}
             </div>
 
             <button

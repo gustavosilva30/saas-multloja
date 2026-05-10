@@ -16,9 +16,8 @@ export const config = {
   NODE_ENV: optional('NODE_ENV', 'production'),
   PORT: parseInt(optional('PORT', '3000')),
 
-  // JWT — obrigatório, sem fallback
   JWT_SECRET: required('JWT_SECRET'),
-  ADMIN_JWT_SECRET: required('ADMIN_JWT_SECRET'),
+  ADMIN_JWT_SECRET: optional('ADMIN_JWT_SECRET', process.env.JWT_SECRET || 'NexusPlatformAdminDefaultSecret'),
   JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
 
   // Database — obrigatório, sem fallback

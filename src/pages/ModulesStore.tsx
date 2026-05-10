@@ -4,7 +4,7 @@ import {
   Store, BarChart3, ShoppingCart, Box, Users, Wrench, Settings, Package,
   Megaphone, Smartphone, FileSearch, Ticket, Zap, Mic, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  X, CheckCircle2, Clock, Loader2, ShoppingBag, Check,
+  X, CheckCircle2, Clock, Loader2, ShoppingBag, Check, Phone,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';

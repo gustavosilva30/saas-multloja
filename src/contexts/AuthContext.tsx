@@ -89,7 +89,7 @@ interface AuthContextType {
   canManageStock: boolean;
   canDelete: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, userData: { full_name: string; tenant_name: string; niche?: string }) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, userData: { full_name: string; tenant_name: string; niche?: string; niche_template_id?: string }) => Promise<{ error: Error | null }>;
   signOut: () => void;
   refreshProfile: () => Promise<void>;
 }
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
-    userData: { full_name: string; tenant_name: string; niche?: string }
+    userData: { full_name: string; tenant_name: string; niche?: string; niche_template_id?: string }
   ): Promise<{ error: Error | null }> => {
     try {
       const { token, user } = await authApi.register({ email, password, ...userData });

@@ -24,7 +24,8 @@ router.post(
     body('password').isLength({ min: 6 }),
     body('full_name').trim().isLength({ min: 2 }),
     body('tenant_name').trim().isLength({ min: 2 }),
-    body('niche').optional().isIn(['varejo', 'oficina', 'clinica', 'restaurante', 'outros']),
+    body('niche').optional(),
+    body('niche_template_id').optional().isUUID(),
   ],
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -34,7 +35,7 @@ router.post(
         return;
       }
 
-      const { email, password, full_name, tenant_name, niche } = req.body;
+      const { email, password, full_name, tenant_name, niche, niche_template_id } = req.body;
 
       // Check if email already exists
       const existingUser = await query(
@@ -54,8 +55,9 @@ router.post(
       const result = await withTransaction(async (client) => {
         // Create tenant
         const tenantResult = await client.query(
-          'INSERT INTO tenants (name, niche, is_active, created_at, updated_at) VALUES ($1, $2, true, NOW(), NOW()) RETURNING id',
-          [tenant_name, niche || 'outros']
+          `INSERT INTO tenants (name, niche, niche_template_id, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, true, NOW(), NOW()) RETURNING id`,
+          [tenant_name, niche || 'outros', niche_template_id || null]
         );
         const tenantId = tenantResult.rows[0].id;
 

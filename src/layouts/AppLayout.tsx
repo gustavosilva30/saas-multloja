@@ -183,7 +183,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const activeSet = new Set(activeModules);
-  const isVoiceAssistantActive = activeSet.has('voice_assistant');
+  const isVoiceAssistantActive = activeSet.has('voice_assistant') || activeSet.has('ai_assistant');
 
   // Which groups have an active page (for defaultOpen)
   const activeGroupIndices = new Set(

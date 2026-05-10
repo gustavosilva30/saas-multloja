@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
-import { query, withTransaction } from '../config/database';
+import { query, withTransaction, tenantContext } from '../config/database';
 import { config } from '../config';
 import { authenticateToken } from '../middleware/auth';
 

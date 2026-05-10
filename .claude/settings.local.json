@@ -24,7 +24,8 @@
       "Bash(xargs grep -l \"import\\\\|from\")",
       "Bash(npm uninstall *)",
       "Bash(grep -v \"tenant_id = \\\\$\\\\|tenant_id =\")",
-      "Bash(xargs ls -la)"
+      "Bash(xargs ls -la)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\pecas\\\\OneDrive\\\\Área de Trabalho\\\\projetos futuros\\\\saas multloja\\\\src\\\\.env\" -Force)"
     ]
   }
 }

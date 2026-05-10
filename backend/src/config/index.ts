@@ -18,6 +18,7 @@ export const config = {
 
   // JWT — obrigatório, sem fallback
   JWT_SECRET: required('JWT_SECRET'),
+  ADMIN_JWT_SECRET: required('ADMIN_JWT_SECRET'),
   JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
 
   // Database — obrigatório, sem fallback

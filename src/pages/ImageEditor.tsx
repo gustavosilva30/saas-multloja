@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ImageIcon, Upload, Wand2, Package, Search, Download, CheckCircle2, Lock } from "lucide-react";
+import { ImageIcon, Upload, Wand2, Package, Search, Download, CheckCircle2, Lock, Sparkles } from "lucide-react";
 import { useTenant } from "../contexts/TenantContext";
 import { AdvancedImageEditor } from "../components/AdvancedImageEditor";
 import { cn } from "../lib/utils";

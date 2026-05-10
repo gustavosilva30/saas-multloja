@@ -1,10 +1,19 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import { query, withTransaction } from '../config/database';
 import { config } from '../config';
 import { authenticateToken } from '../middleware/auth';
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
@@ -19,9 +28,13 @@ interface JWTPayload {
 // Register new user with tenant
 router.post(
   '/register',
+  authLimiter,
   [
     body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
+    body('password')
+      .isLength({ min: 8 })
+      .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+      .matches(/[0-9]/).withMessage('Password must contain at least one number'),
     body('full_name').trim().isLength({ min: 2 }),
     body('tenant_name').trim().isLength({ min: 2 }),
     body('niche').optional(),
@@ -49,7 +62,7 @@ router.post(
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 12);
 
       // Create tenant and user in transaction
       const result = await withTransaction(async (client) => {
@@ -104,6 +117,7 @@ router.post(
 // Login
 router.post(
   '/login',
+  authLimiter,
   [
     body('email').isEmail().normalizeEmail(),
     body('password').notEmpty(),
@@ -210,7 +224,10 @@ router.post(
   authenticateToken,
   [
     body('currentPassword').notEmpty(),
-    body('newPassword').isLength({ min: 6 }),
+    body('newPassword')
+      .isLength({ min: 8 })
+      .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+      .matches(/[0-9]/).withMessage('Password must contain at least one number'),
   ],
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -246,7 +263,7 @@ router.post(
       }
 
       // Hash new password
-      const newHash = await bcrypt.hash(newPassword, 10);
+      const newHash = await bcrypt.hash(newPassword, 12);
 
       // Update password
       await query(

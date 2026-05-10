@@ -7,7 +7,7 @@ import { config } from '../config';
 
 const router = Router();
 
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || config.JWT_SECRET + '_admin';
+const ADMIN_JWT_SECRET = config.ADMIN_JWT_SECRET;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 async function adminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -273,6 +273,11 @@ router.put('/modules/:moduleId', adminAuth, async (req: Request, res: Response):
 router.post('/seed',
   [body('email').isEmail(), body('password').isLength({ min: 8 }), body('full_name').notEmpty()],
   async (req: Request, res: Response): Promise<void> => {
+    // Require a pre-shared secret header to prevent unauthorized seed
+    const seedSecret = process.env.SEED_SECRET;
+    if (!seedSecret || req.headers['x-seed-secret'] !== seedSecret) {
+      res.status(403).json({ error: 'Forbidden' }); return;
+    }
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }

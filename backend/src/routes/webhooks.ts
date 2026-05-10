@@ -6,7 +6,13 @@ const router = Router();
 
 // Valida o token de autenticação enviado pelo Asaas no header
 function validateAsaasToken(req: Request, res: Response): boolean {
-  if (!config.ASAAS_WEBHOOK_TOKEN) return true; // sem token configurado, aceita (dev)
+  if (!config.ASAAS_WEBHOOK_TOKEN) {
+    if (config.NODE_ENV === 'production') {
+      res.status(503).json({ error: 'Webhook not configured' });
+      return false;
+    }
+    return true; // dev-only bypass
+  }
 
   const incoming = req.headers['asaas-access-token'] as string | undefined;
   if (!incoming || incoming !== config.ASAAS_WEBHOOK_TOKEN) {

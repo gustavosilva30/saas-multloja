@@ -18,14 +18,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-nexus_password_2024}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       POSTGRES_DB: nexus_erp
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/database/init:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_erp"]
       interval: 10s
@@ -44,13 +44,13 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: nexus
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minio_password_2024}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?MINIO_PASSWORD is required}
       MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
     volumes:
       - minio_data:/data
     ports:
-      - "9000:9000"   # API S3
-      - "9001:9001"   # Console Web
+      - "127.0.0.1:9000:9000"   # API S3
+      - "127.0.0.1:9001:9001"   # Console Web
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -66,11 +66,11 @@ services:
     image: redis:7-alpine
     container_name: nexus-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -91,15 +91,17 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://nexus:${DB_PASSWORD:-nexus_password_2024}@postgres:5432/nexus_erp
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_in_production_32chars}
+      DATABASE_URL: postgresql://nexus:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/nexus_erp
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
+      SEED_SECRET: ${SEED_SECRET:-}
       JWT_EXPIRES_IN: 7d
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: "false"
       MINIO_ACCESS_KEY: nexus
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minio_password_2024}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:?MINIO_PASSWORD is required}
       MINIO_BUCKET: nexus-uploads
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -130,15 +132,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://nexus:${DB_PASSWORD:-nexus_password_2024}@postgres:5432/nexus_erp
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-change_this_in_production_32chars_minimum}
+      DATABASE_URL: postgresql://nexus:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/nexus_erp
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?ADMIN_JWT_SECRET is required}
+      SEED_SECRET: ${SEED_SECRET:-}
       JWT_EXPIRES_IN: 7d
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: "false"
       MINIO_ACCESS_KEY: nexus
-      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minio_password_2024}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:?MINIO_PASSWORD is required}
       MINIO_BUCKET: nexus-uploads
       CORS_ORIGIN: ${CORS_ORIGIN:-https://seu-app.vercel.app}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

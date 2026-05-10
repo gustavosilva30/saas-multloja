@@ -1,58 +1,143 @@
+// =============================================================================
+// 🔒 C6: Token de acesso vive APENAS em memória (escopo do módulo).
+// Refresh token vive em cookie httpOnly que o browser anexa automaticamente
+// quando passamos `credentials: 'include'`. localStorage NUNCA é usado para auth.
+// =============================================================================
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
-function getToken(): string | null {
-  return localStorage.getItem('auth_token');
-}
+let inMemoryAccessToken: string | null = null;
+let onSessionExpired: (() => void) | null = null;
 
-let isRefreshing = false;
+export function setAccessToken(token: string | null): void { inMemoryAccessToken = token; }
+export function getAccessToken(): string | null { return inMemoryAccessToken; }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    credentials: 'include', // Send cookies (Refresh Token)
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+/**
+ * Permite ao AuthContext registrar um callback de logout. Quando o refresh
+ * falha, chamamos isso ao invés de hard-redirect para preservar o estado React.
+ */
+export function setSessionExpiredHandler(fn: () => void): void { onSessionExpired = fn; }
 
-  // Se o token expirou (401) e não estamos na rota de login ou na própria rota de refresh
-  if (res.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/refresh') && !isRefreshing) {
-    isRefreshing = true;
+// ─── Refresh com lock (evita N requests dispararem N refreshes em paralelo) ──
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
     try {
-      const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
+      const r = await fetch(`${API_URL}/api/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       });
-
-      if (refreshRes.ok) {
-        const { token: newToken } = await refreshRes.json();
-        localStorage.setItem('auth_token', newToken);
-        isRefreshing = false;
-        // Retry original request
-        return request<T>(path, options);
-      }
-    } catch (err) {
-      // Refresh failed
+      if (!r.ok) return null;
+      const { token } = await r.json();
+      inMemoryAccessToken = token;
+      return token as string;
+    } catch {
+      return null;
     } finally {
-      isRefreshing = false;
+      refreshInFlight = null;
     }
+  })();
+  return refreshInFlight;
+}
 
-    // Se falhou o refresh, limpa e redireciona (ou deixa o context tratar)
-    localStorage.removeItem('auth_token');
-    window.location.href = '/login';
-    throw new Error('Sessão expirada. Faça login novamente.');
+/**
+ * Tenta reidratar a sessão lendo o cookie httpOnly. Usado no bootstrap do app.
+ * Retorna o user (via /me) ou null se não houver sessão válida.
+ */
+export async function bootstrapSession<T = AuthUser>(): Promise<T | null> {
+  const token = await refreshAccessToken();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.user as T;
+  } catch { return null; }
+}
+
+// ─── Wrapper apiFetch ────────────────────────────────────────────────────────
+
+export interface ApiFetchOptions extends Omit<RequestInit, 'body'> {
+  body?: any;            // aceita objeto direto — serializamos como JSON
+  raw?: boolean;         // se true, devolve a Response sem fazer .json()
+  noAuth?: boolean;      // requisições públicas (não envia Authorization)
+}
+
+/**
+ * Substitui o fetch nativo em todo o frontend.
+ * - Sempre injeta credentials: 'include' (necessário para o cookie de refresh).
+ * - Injeta Authorization: Bearer <token-em-memória>.
+ * - Em caso de 401, tenta refresh automático e refaz a request original.
+ * - Se o refresh falhar, dispara o handler de sessão expirada.
+ */
+export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
+  const { body, raw, noAuth, headers: extraHeaders, ...rest } = opts;
+
+  // Aceita: undefined, FormData (passa direto), string (assume JSON pré-serializado),
+  // qualquer objeto (serializa). Evita duplo-encode se o caller já chamou JSON.stringify.
+  const isFormData = body instanceof FormData;
+  const isString   = typeof body === 'string';
+  const serialized = body === undefined ? undefined
+                   : isFormData          ? body
+                   : isString            ? body
+                   : JSON.stringify(body);
+  const needsJsonHeader = body !== undefined && !isFormData;
+
+  const buildInit = (token: string | null): RequestInit => ({
+    ...rest,
+    credentials: 'include',
+    headers: {
+      ...(needsJsonHeader ? { 'Content-Type': 'application/json' } : {}),
+      ...(!noAuth && token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extraHeaders,
+    },
+    body: serialized,
+  });
+
+  const url = `${API_URL}${path}`;
+  let response = await fetch(url, buildInit(inMemoryAccessToken));
+
+  // ── Interceptor 401: tenta refresh + retry uma única vez ──
+  const isAuthEndpoint = path.startsWith('/api/auth/login')
+                      || path.startsWith('/api/auth/register')
+                      || path.startsWith('/api/auth/refresh');
+
+  if (response.status === 401 && !noAuth && !isAuthEndpoint) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await fetch(url, buildInit(newToken));
+    } else {
+      // Sessão morta — limpa estado e dispara handler
+      inMemoryAccessToken = null;
+      if (onSessionExpired) onSessionExpired();
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
   }
 
-  const data = await res.json().catch(() => ({}));
+  if (raw) return response as unknown as T;
 
-  if (!res.ok) {
-    throw new Error(data?.error || `Request failed: ${res.status}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || data?.errors?.[0]?.msg || `Request failed: ${response.status}`);
   }
-
   return data as T;
+}
+
+// ─── Compat: mantém request() apontando para apiFetch ────────────────────────
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const { method, body, headers } = options;
+  return apiFetch<T>(path, {
+    method,
+    headers: headers as any,
+    body: body ? JSON.parse(body as string) : undefined,
+  });
 }
 
 // ─── Auth ────────────────────────────────────────────────────
@@ -150,18 +235,9 @@ export const salesApi = {
 // ─── Upload ───────────────────────────────────────────────────
 
 export const uploadApi = {
-  upload: async (file: File): Promise<{ url: string }> => {
-    const token = getToken();
+  upload: (file: File): Promise<{ url: string }> => {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${API_URL}/api/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || 'Upload failed');
-    return data;
+    return apiFetch<{ url: string }>('/api/upload', { method: 'POST', body: form });
   },
 };

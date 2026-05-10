@@ -3,9 +3,7 @@ import { ImageIcon, Upload, Wand2, Package, Search, Download, CheckCircle2, Lock
 import { useTenant } from "../contexts/TenantContext";
 import { AdvancedImageEditor } from "../components/AdvancedImageEditor";
 import { cn } from "../lib/utils";
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
-const token = () => localStorage.getItem('auth_token') || '';
+import { apiFetch } from '@/lib/api';
 
 interface Product {
   id: string;
@@ -43,10 +41,7 @@ export function ImageEditor() {
   const fetchProducts = async () => {
     setLoadingProducts(true);
     try {
-      const res = await fetch(`${API}/api/products?limit=50`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const data = await res.json();
+      const data = await apiFetch<{ products?: Product[] }>('/api/products?limit=50').catch(() => ({} as any));
       if (data.products) {
         // Only products with images
         setProducts(data.products.filter((p: any) => p.image_url));

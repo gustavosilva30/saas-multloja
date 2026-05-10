@@ -114,7 +114,21 @@ router.post('/groups/:groupId/members', wrap(async (req, res) => {
 
 router.put('/groups/:groupId/members/:memberId', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const { name, role, avatar_color, avatar_emoji, income_share, phone } = req.body;
+  const ALLOWED_ROLE = ['ADMIN', 'ADULT', 'CHILD'] as const;
+
+  let { name, role, avatar_color, avatar_emoji, income_share, phone } = req.body;
+  if (name !== undefined) {
+    name = String(name).trim();
+    if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
+  }
+  if (role !== undefined) role = parseEnum(role, ALLOWED_ROLE, 'role');
+  if (income_share !== undefined && income_share !== null) {
+    income_share = parseMoney(income_share, { min: 0, max: 100, field: 'income_share', allowZero: true });
+  }
+  if (phone !== undefined && phone !== null && String(phone).length > 20) {
+    return res.status(400).json({ error: 'phone excede 20 caracteres' });
+  }
+
   const r = await query(
     `UPDATE family_members SET
        name         = COALESCE($1, name),
@@ -143,13 +157,17 @@ router.delete('/groups/:groupId/members/:memberId', wrap(async (req, res) => {
 
 router.get('/groups/:groupId/expenses', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
-  const { month, limit = '30' } = req.query as Record<string, string>;
+  const { month } = req.query as Record<string, string>;
+  const limit = Math.min(200, Math.max(1, parseInt((req.query.limit as string) || '30', 10) || 30));
 
   const conditions = [`e.group_id = $1`, `e.tenant_id = $2`];
   const params: any[] = [gid(req), tid(req)];
   let i = 3;
 
   if (month) {
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: 'month inválido (use YYYY-MM)' });
+    }
     conditions.push(`TO_CHAR(e.expense_date, 'YYYY-MM') = $${i++}`);
     params.push(month);
   }
@@ -161,7 +179,7 @@ router.get('/groups/:groupId/expenses', wrap(async (req, res) => {
      WHERE ${conditions.join(' AND ')}
      ORDER BY e.expense_date DESC, e.created_at DESC
      LIMIT $${i}`,
-    [...params, parseInt(limit)]
+    [...params, limit]
   );
   res.json({ expenses: r.rows });
 }));

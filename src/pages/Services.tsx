@@ -5,8 +5,7 @@ import {
   X, Package, ChevronDown, Trash2, PlusCircle, Tag,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+import { apiFetch } from '@/lib/api';
 
 type OSStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'COMPLETED' | 'CANCELED';
 type ItemType = 'SERVICE' | 'PRODUCT';
@@ -69,8 +68,7 @@ const fmtCurrency = (val: string | number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
 
 // ── Customer Search Input ─────────────────────────────────────────────────────
-function CustomerSearch({ token, value, onChange }: {
-  token: string;
+function CustomerSearch({ value, onChange }: {
   value: { id: string; name: string } | null;
   onChange: (c: { id: string; name: string } | null) => void;
 }) {
@@ -83,10 +81,7 @@ function CustomerSearch({ token, value, onChange }: {
     if (!query || query.length < 2) { setResults([]); return; }
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
-      const r = await fetch(`${API}/api/customers?search=${encodeURIComponent(query)}&limit=8`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const d = await r.json();
+      const d = await apiFetch<{ customers: Customer[] }>(`/api/customers?search=${encodeURIComponent(query)}&limit=8`);
       setResults(d.customers || []);
       setOpen(true);
     }, 300);
@@ -134,8 +129,7 @@ function CustomerSearch({ token, value, onChange }: {
 }
 
 // ── Product Search for Items ──────────────────────────────────────────────────
-function ProductSearch({ token, itemType, onSelect }: {
-  token: string;
+function ProductSearch({ itemType, onSelect }: {
   itemType: ItemType;
   onSelect: (p: Product) => void;
 }) {
@@ -148,10 +142,7 @@ function ProductSearch({ token, itemType, onSelect }: {
     if (!query || query.length < 2) { setResults([]); return; }
     clearTimeout(debounce.current);
     debounce.current = setTimeout(async () => {
-      const r = await fetch(`${API}/api/products?search=${encodeURIComponent(query)}&limit=8`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const d = await r.json();
+      const d = await apiFetch<{ products: Product[] }>(`/api/products?search=${encodeURIComponent(query)}&limit=8`);
       setResults(d.products || []);
       setOpen(true);
     }, 300);
@@ -191,8 +182,7 @@ function ProductSearch({ token, itemType, onSelect }: {
 }
 
 // ── Nova OS Modal ─────────────────────────────────────────────────────────────
-function NewOsModal({ token, onClose, onCreated }: {
-  token: string;
+function NewOsModal({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -237,23 +227,20 @@ function NewOsModal({ token, onClose, onCreated }: {
     }
 
     try {
-      const r = await fetch(`${API}/api/service-orders`, {
+      await apiFetch('/api/service-orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
+        body: {
           customer_id: customer?.id,
           expected_at: expectedAt || undefined,
           customer_notes: customerNotes || undefined,
           internal_notes: internalNotes || undefined,
           asset_metadata: assetMetadata,
           items,
-        }),
+        },
       });
-      const d = await r.json();
-      if (!r.ok) { setError(d.error || d.errors?.[0]?.msg || 'Erro ao criar OS'); setSaving(false); return; }
       onCreated();
-    } catch {
-      setError('Falha de conexão');
+    } catch (e: any) {
+      setError(e.message || 'Falha de conexão');
       setSaving(false);
     }
   };
@@ -281,7 +268,7 @@ function NewOsModal({ token, onClose, onCreated }: {
           {/* Cliente */}
           <div>
             <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Cliente</label>
-            <CustomerSearch token={token} value={customer} onChange={setCustomer} />
+            <CustomerSearch value={customer} onChange={setCustomer} />
           </div>
 
           {/* Dados do ativo (JSONB livre) */}
@@ -388,7 +375,6 @@ function NewOsModal({ token, onClose, onCreated }: {
                         />
                       ) : (
                         <ProductSearch
-                          token={token}
                           itemType={it.item_type}
                           onSelect={p => {
                             updateItem(idx, 'description', p.name);
@@ -491,31 +477,27 @@ function NewOsModal({ token, onClose, onCreated }: {
                   if (f.key.trim() && f.value.trim()) assetMetadata[f.key.trim()] = f.value.trim();
                 }
                 try {
-                  const r = await fetch(`${API}/api/service-orders`, {
+                  const d = await apiFetch<any>('/api/service-orders', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({
+                    body: {
                       customer_id: customer?.id,
                       expected_at: expectedAt || undefined,
                       customer_notes: customerNotes || undefined,
                       internal_notes: internalNotes || undefined,
                       asset_metadata: assetMetadata,
                       items,
-                    }),
+                    },
                   });
-                  const d = await r.json();
-                  if (!r.ok) { setError(d.error || 'Erro ao criar OS'); setSaving(false); return; }
 
                   // Transition to PENDING_APPROVAL (triggers WhatsApp)
-                  await fetch(`${API}/api/service-orders/${d.service_order.id}/status`, {
+                  await apiFetch(`/api/service-orders/${d.service_order.id}/status`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ status: 'PENDING_APPROVAL', note: 'Enviado para aprovação do cliente' }),
+                    body: { status: 'PENDING_APPROVAL', note: 'Enviado para aprovação do cliente' },
                   });
 
                   onCreated();
-                } catch {
-                  setError('Falha de conexão');
+                } catch (e: any) {
+                  setError(e.message || 'Falha de conexão');
                   setSaving(false);
                 }
               }}
@@ -543,8 +525,6 @@ export function Services() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [showNewModal, setShowNewModal] = useState(false);
 
-  const token = localStorage.getItem('auth_token') ?? '';
-
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -552,18 +532,15 @@ export function Services() {
       if (search) qp.append('search', search);
       if (statusFilter) qp.append('status', statusFilter);
 
-      const [osRes, statsRes] = await Promise.all([
-        fetch(`${API}/api/service-orders?${qp}`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API}/api/service-orders/stats`,  { headers: { Authorization: `Bearer ${token}` } }),
+      const [osData, statsData] = await Promise.all([
+        apiFetch<any>(`/api/service-orders?${qp}`),
+        apiFetch<Stats>('/api/service-orders/stats'),
       ]);
-
-      const [osData, statsData] = await Promise.all([osRes.json(), statsRes.json()]);
       setOrders(osData.service_orders || []);
       setStats(statsData);
     } catch (err) {
       console.error('Error fetching OS:', err);
-    }
-    setLoading(false);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, [statusFilter]);
@@ -719,7 +696,6 @@ export function Services() {
 
       {showNewModal && (
         <NewOsModal
-          token={token}
           onClose={() => setShowNewModal(false)}
           onCreated={() => { setShowNewModal(false); fetchData(); }}
         />

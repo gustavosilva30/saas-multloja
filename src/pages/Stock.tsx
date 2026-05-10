@@ -4,25 +4,14 @@ import {
   MoreHorizontal, Pencil, Trash2, Copy, Upload, Image as ImageIcon,
   ChevronLeft, ChevronRight, Filter, LayoutGrid, List as ListIcon, Wand2,
 } from 'lucide-react';
-import { uploadApi } from '../lib/api';
+import { uploadApi, apiFetch as apiCall, ApiFetchOptions } from '../lib/api';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { AdvancedImageEditor } from '../components/AdvancedImageEditor';
 
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
-const token = () => localStorage.getItem('auth_token') || '';
-
-const apiFetch = async <T,>(path: string, opts: RequestInit = {}): Promise<T> => {
-  const res = await fetch(`${API}/api/products${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}`, ...opts.headers },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Erro na requisição');
-  }
-  return res.json();
-};
+// Wrapper local — todas as rotas deste arquivo são sob /api/products
+const apiFetch = <T,>(path: string, opts: ApiFetchOptions = {}): Promise<T> =>
+  apiCall<T>(`/api/products${path}`, opts);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -928,10 +917,7 @@ export function Stock() {
   useEffect(() => {
     const tid = (user as unknown as { niche_template_id?: string })?.niche_template_id;
     if (!tid) return;
-    fetch(`${API}/api/niches/${tid}/schema`, {
-      headers: { Authorization: `Bearer ${token()}` },
-    })
-      .then(r => r.ok ? r.json() : null)
+    apiCall<any>(`/api/niches/${tid}/schema`)
       .then(d => d && setNicheTemplate(d.niche ?? null))
       .catch(() => {});
   }, [user]);

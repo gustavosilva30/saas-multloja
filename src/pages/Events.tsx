@@ -6,8 +6,7 @@ import {
   BarChart3, Send, Search, UserPlus, RefreshCw,
 } from 'lucide-react';
 import { EventWizard } from '../components/EventWizard';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+import { apiFetch } from '@/lib/api';
 
 interface TicketType { id: string; name: string; price: string; capacity: number; color: string }
 interface Event {
@@ -42,8 +41,8 @@ const fmtCurrency = (v: string | number) =>
 
 
 // ── Modal: Detalhe do Evento + Convidados ─────────────────────────────────────
-function EventDetailModal({ event, token, onClose }: {
-  event: Event; token: string; onClose: () => void;
+function EventDetailModal({ event, onClose }: {
+  event: Event; onClose: () => void;
 }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<'guests' | 'types'>('guests');
@@ -60,17 +59,17 @@ function EventDetailModal({ event, token, onClose }: {
 
   const fetchGuests = async (q = '') => {
     setLoading(true);
-    const [gRes, sRes, tRes] = await Promise.all([
-      fetch(`${API}/api/events/${event.id}/guests?limit=100${q ? `&search=${encodeURIComponent(q)}` : ''}`,
-        { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API}/api/events/${event.id}/stats`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API}/api/events/${event.id}`, { headers: { Authorization: `Bearer ${token}` } }),
-    ]);
-    const [gd, sd, td] = await Promise.all([gRes.json(), sRes.json(), tRes.json()]);
-    setGuests(gd.guests || []);
-    setStats(sd);
-    setTypes(td.ticket_types || []);
-    setLoading(false);
+    try {
+      const qs = q ? `&search=${encodeURIComponent(q)}` : '';
+      const [gd, sd, td] = await Promise.all([
+        apiFetch<any>(`/api/events/${event.id}/guests?limit=100${qs}`),
+        apiFetch<any>(`/api/events/${event.id}/stats`),
+        apiFetch<any>(`/api/events/${event.id}`),
+      ]);
+      setGuests(gd.guests || []);
+      setStats(sd);
+      setTypes(td.ticket_types || []);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchGuests(); }, []);
@@ -79,25 +78,20 @@ function EventDetailModal({ event, token, onClose }: {
     if (!addForm.name) { setAddError('Nome é obrigatório'); return; }
     setAddSaving(true); setAddError('');
     try {
-      const r = await fetch(`${API}/api/events/${event.id}/guests`, {
+      await apiFetch(`/api/events/${event.id}/guests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...addForm, ticket_type_id: addForm.ticket_type_id || undefined }),
+        body: { ...addForm, ticket_type_id: addForm.ticket_type_id || undefined },
       });
-      const d = await r.json();
-      if (!r.ok) { setAddError(d.error || 'Erro'); setAddSaving(false); return; }
       setAddOpen(false);
       setAddForm({ name: '', phone: '', email: '', ticket_type_id: '', send_ticket: true });
       fetchGuests();
-    } catch { setAddError('Falha de conexão'); }
-    setAddSaving(false);
+    } catch (e: any) { setAddError(e.message || 'Falha de conexão'); }
+    finally { setAddSaving(false); }
   };
 
   const resend = async (guestId: string) => {
     setResending(guestId);
-    await fetch(`${API}/api/events/${event.id}/guests/${guestId}/resend`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` },
-    }).catch(() => {});
+    await apiFetch(`/api/events/${event.id}/guests/${guestId}/resend`, { method: 'POST' }).catch(() => {});
     setResending(null);
   };
 
@@ -321,16 +315,13 @@ export function Events() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Event | null>(null);
 
-  const token = localStorage.getItem('auth_token') ?? '';
-
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/events`, { headers: { Authorization: `Bearer ${token}` } });
-      const d = await r.json();
+      const d = await apiFetch<{ events: Event[] }>('/api/events');
       setEvents(d.events || []);
     } catch { /* silencioso */ }
-    setLoading(false);
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchEvents(); }, []);
@@ -446,25 +437,19 @@ export function Events() {
               }))
             };
 
-            const r = await fetch(`${API}/api/events`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify(payload),
-            });
-            
-            if (r.ok) {
+            try {
+              await apiFetch('/api/events', { method: 'POST', body: payload });
               fetchEvents();
               setShowNew(false);
-            } else {
-              const d = await r.json();
-              alert(d.error || 'Erro ao criar evento');
+            } catch (e: any) {
+              alert(e.message || 'Erro ao criar evento');
             }
           }}
         />
       )}
 
       {selected && (
-        <EventDetailModal event={selected} token={token} onClose={() => setSelected(null)} />
+        <EventDetailModal event={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );

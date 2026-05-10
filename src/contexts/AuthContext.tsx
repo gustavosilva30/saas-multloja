@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { authApi, AuthUser } from '@/lib/api';
+import {
+  authApi, AuthUser,
+  setAccessToken, bootstrapSession, setSessionExpiredHandler,
+} from '@/lib/api';
 
 // ─── Tipos ────────────────────────────────────────────────────
 
@@ -102,32 +105,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carregar usuário do token salvo
+  // ── Bootstrap: tenta reidratar a sessão a partir do cookie httpOnly ──
+  // O cookie `rt` é enviado automaticamente pelo browser via credentials: 'include'.
+  // Se ainda for válido, /api/auth/refresh devolve um novo access token (em memória)
+  // e podemos chamar /me para popular o usuário.
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-    authApi.me()
-      .then(({ user }) => setUser(user))
-      .catch(() => localStorage.removeItem('auth_token'))
+    bootstrapSession<AuthUser>()
+      .then((u) => { if (u) setUser(u); })
       .finally(() => setIsLoading(false));
+  }, []);
+
+  // ── Handler de sessão expirada ──
+  // O apiFetch dispara isso quando o refresh falha (cookie expirou ou foi revogado).
+  // Em vez de hard-redirect, limpamos o estado React para a UI reagir ao logout.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setAccessToken(null);
+      setUser(null);
+    });
   }, []);
 
   const refreshProfile = useCallback(async () => {
     try {
       const { user } = await authApi.me();
       setUser(user);
-    } catch {
-      // token inválido
-    }
+    } catch { /* sessão inválida — apiFetch já tratou */ }
   }, []);
 
   const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
     try {
       const { token, user } = await authApi.login(email, password);
-      localStorage.setItem('auth_token', token);
+      setAccessToken(token);                     // ← em memória, não localStorage
       setUser(user);
       return { error: null };
     } catch (err) {
@@ -142,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ error: Error | null }> => {
     try {
       const { token, user } = await authApi.register({ email, password, ...userData });
-      localStorage.setItem('auth_token', token);
+      setAccessToken(token);
       setUser(user);
       return { error: null };
     } catch (err) {
@@ -150,12 +158,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = () => {
-    authApi.logout().finally(() => {
-      localStorage.removeItem('auth_token');
-      setUser(null);
-      window.location.href = '/login';
-    });
+  const signOut = async () => {
+    try { await authApi.logout(); } catch { /* sempre limpa local mesmo se request falhar */ }
+    setAccessToken(null);
+    setUser(null);
+    // Não força redirect — o RouterConfig em App.tsx já reage a isAuthenticated=false
   };
 
   // RBAC

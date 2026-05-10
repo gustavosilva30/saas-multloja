@@ -10,12 +10,17 @@ const router = Router();
 
 const ADMIN_JWT_SECRET = config.ADMIN_JWT_SECRET;
 
+
+// 🔒 A1: Rate-limit estrito no login do super-admin — defesa contra brute force.
+// Chave por IP+email para impedir password spraying e proteger contas individuais.
 const adminLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 15 * 60 * 1000,           // 15 minutos
   max: 5,
-  message: { error: 'Too many admin login attempts, please try again in an hour.' },
+  skipSuccessfulRequests: true,        // sucesso não consome quota
+  message: { error: 'Muitas tentativas de login. Aguarde 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}|${String(req.body?.email || '').toLowerCase()}`,
 });
 
 // ── Middleware ────────────────────────────────────────────────────────────────

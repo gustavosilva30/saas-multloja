@@ -2,8 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { CheckCircle2, XCircle, Camera, ArrowLeft, Loader2, Wifi } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+import { apiFetch } from '@/lib/api';
 
 type ScanResult = {
   color: 'GREEN' | 'RED';
@@ -51,13 +50,10 @@ export function EventScanner() {
   const [stats, setStats] = useState<{ checked_in: number; total_guests: number } | null>(null);
   const [cameraError, setCameraError] = useState('');
 
-  const token = localStorage.getItem('auth_token') ?? '';
-
   // Busca nome e stats do evento
   useEffect(() => {
     if (!eventId) return;
-    fetch(`${API}/api/events/${eventId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
+    apiFetch<any>(`/api/events/${eventId}`)
       .then(d => { if (d.event) setEventName(d.event.name); if (d.stats) setStats(d.stats); })
       .catch(() => {});
   }, [eventId]);
@@ -66,10 +62,7 @@ export function EventScanner() {
   useEffect(() => {
     if (!eventId) return;
     const iv = setInterval(() => {
-      fetch(`${API}/api/events/${eventId}/stats`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json())
-        .then(d => setStats(d))
-        .catch(() => {});
+      apiFetch<any>(`/api/events/${eventId}/stats`).then(setStats).catch(() => {});
     }, 10_000);
     return () => clearInterval(iv);
   }, [eventId]);
@@ -85,19 +78,17 @@ export function EventScanner() {
     setResult(null);
 
     try {
-      const r = await fetch(`${API}/api/events/scan-qr`, {
+      const data = await apiFetch<any>('/api/events/scan-qr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ token: tkn, event_id: eventId }),
-      });
-      const data = await r.json();
+        body: { token: tkn, event_id: eventId },
+        raw: false,
+      }).catch(err => ({ color: 'RED', message: err?.message || '⛔ Falha de validação' }));
 
-      const color: 'GREEN' | 'RED' = data.color ?? (r.ok ? 'GREEN' : 'RED');
+      const color: 'GREEN' | 'RED' = data.color ?? 'RED';
       setResult({ color, message: data.message, guest: data.guest });
       playBeep(color === 'GREEN');
 
       if (color === 'GREEN' && data.stats) setStats(data.stats);
-      // Atualiza stats localmente
       if (color === 'GREEN') {
         setStats(prev => prev ? { ...prev, checked_in: prev.checked_in + 1 } : prev);
       }
@@ -113,7 +104,7 @@ export function EventScanner() {
         setResult(null);
       }, 2500);
     }
-  }, [eventId, token]);
+  }, [eventId]);
 
   const startScanner = useCallback(async () => {
     setCameraError('');

@@ -6,21 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
-const token = () => localStorage.getItem('auth_token') || '';
-
-const apiFetch = async <T,>(path: string, opts: RequestInit = {}): Promise<T> => {
-  const res = await fetch(`${API}${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}`, ...opts.headers },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Erro na requisição');
-  }
-  return res.json();
-};
+import { apiFetch } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

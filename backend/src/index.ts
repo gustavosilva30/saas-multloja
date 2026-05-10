@@ -44,17 +44,23 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS
+// 🔒 C6: cookies httpOnly exigem credentials:true, e a spec proíbe origin '*' nesse caso.
+// Em produção, sempre exigir lista explícita de origens.
+if (config.CORS_ORIGIN === '*' && config.NODE_ENV === 'production') {
+  throw new Error('CORS_ORIGIN=* não é permitido em produção (incompatível com cookies httpOnly).');
+}
 const allowedOrigins = config.CORS_ORIGIN === '*'
   ? '*'
   : config.CORS_ORIGIN.split(',').map(o => o.trim());
 
 app.use(cors({
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin || allowedOrigins === '*') return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (allowedOrigins === '*') return callback(null, true);
     if ((allowedOrigins as string[]).includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
-  credentials: true,
+  credentials: true,                              // necessário para o cookie de refresh
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));

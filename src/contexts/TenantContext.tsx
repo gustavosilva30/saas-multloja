@@ -1,9 +1,8 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import { apiFetch, getAccessToken } from '@/lib/api';
 
 export type Niche = 'varejo' | 'oficina' | 'clinica' | 'restaurante' | null;
-export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check' | 'whatsapp_integration';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check' | 'whatsapp_integration' | 'family_hub';
 
 interface TenantState {
   themeColor: string;
@@ -30,13 +29,8 @@ const initialState: TenantState = {
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 function syncModulesToBackend(modules: ModuleId[]) {
-  const token = localStorage.getItem('auth_token');
-  if (!token) return;
-  fetch(`${API}/api/modules`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ modules }),
-  }).catch(() => {});
+  if (!getAccessToken()) return;
+  apiFetch('/api/modules', { method: 'PUT', body: { modules } }).catch(() => {});
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {

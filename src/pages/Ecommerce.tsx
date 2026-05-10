@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Plus, Trash2, CheckCircle2, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { apiFetch, getAccessToken } from '@/lib/api';
 
 const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
 
@@ -16,8 +17,6 @@ export function Ecommerce() {
   const [accounts, setAccounts] = useState<MLAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-
-  const token = () => localStorage.getItem('auth_token') || '';
 
   useEffect(() => {
     // Verificar status na URL (vindo do callback do backend)
@@ -36,10 +35,7 @@ export function Ecommerce() {
 
   const loadAccounts = async () => {
     try {
-      const res = await fetch(`${API}/api/ecommerce/mercadolivre/accounts`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      });
-      const data = await res.json();
+      const data = await apiFetch<{ accounts: MLAccount[] }>('/api/ecommerce/mercadolivre/accounts');
       setAccounts(data.accounts || []);
     } catch (err) {
       console.error('Failed to load accounts');
@@ -49,20 +45,17 @@ export function Ecommerce() {
   };
 
   const handleConnectML = () => {
-    // Redirecionar para a rota do backend que inicia o OAuth
-    // Precisamos enviar o token de auth via URL ou o backend deve lidar com isso
-    // Como é um redirecionamento, o melhor é o backend validar o token se possível,
-    // ou passamos via query e o backend valida.
-    window.location.href = `${API}/api/ecommerce/mercadolivre/auth?token=${token()}`;
+    // OAuth handshake — o token vai na URL (limitação do redirect).
+    // TODO: trocar por state token assinado pelo backend para não vazar JWT em logs.
+    const tk = getAccessToken();
+    if (!tk) { alert('Sessão expirada — faça login novamente'); return; }
+    window.location.href = `${API}/api/ecommerce/mercadolivre/auth?token=${tk}`;
   };
 
   const removeAccount = async (id: string) => {
     if (!confirm('Tem certeza que deseja remover esta integração?')) return;
     try {
-      await fetch(`${API}/api/ecommerce/mercadolivre/accounts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token()}` }
-      });
+      await apiFetch(`/api/ecommerce/mercadolivre/accounts/${id}`, { method: 'DELETE' });
       setAccounts(prev => prev.filter(a => a.id !== id));
     } catch (err) {
       alert('Erro ao remover conta');

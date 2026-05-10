@@ -6,8 +6,7 @@ import {
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
   X, CheckCircle2, Clock, Loader2, ShoppingBag, Check, Phone,
 } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+import { apiFetch } from '@/lib/api';
 
 const MODULE_ICONS: Record<string, ElementType> = {
   dashboard: BarChart3, pos: ShoppingCart, stock: Box, customers: Users,
@@ -255,11 +254,8 @@ export function ModulesStore() {
   const [pixResult, setPixResult] = useState<BundlePixResult | null>(null);
   const [showCpf, setShowCpf] = useState(false);
 
-  const token = () => localStorage.getItem('auth_token') || '';
-
   useEffect(() => {
-    fetch(`${API}/api/modules/catalog`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.json())
+    apiFetch<{ modules: any[] }>('/api/modules/catalog')
       .then(d => { setCatalog(d.modules || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
@@ -281,17 +277,15 @@ export function ModulesStore() {
       if (cpfCnpj) body.cpfCnpj = cpfCnpj.replace(/\D/g, '');
       if (mobilePhone) body.mobilePhone = mobilePhone.replace(/\D/g, '');
 
-      const res = await fetch(`${API}/api/modules/purchase-bundle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(body),
+      // raw=true para inspecionar status 422 (CPF requerido) sem o apiFetch lançar
+      const res = await apiFetch<Response>('/api/modules/purchase-bundle', {
+        method: 'POST', body, raw: true,
       });
       const data = await res.json();
 
       if (res.status === 422) { setShowCpf(true); setCheckoutLoading(false); return; }
       if (!res.ok) { alert(data.error || 'Erro ao gerar cobrança'); setCheckoutLoading(false); return; }
 
-      // Mark selected as pending locally
       const purchasedIds = new Set((data.modules as { module_id: string }[]).map(m => m.module_id));
       setCatalog(prev => prev.map(m =>
         purchasedIds.has(m.module_id) ? { ...m, payment_status: 'pending' as const } : m

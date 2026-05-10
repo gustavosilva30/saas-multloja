@@ -15,6 +15,7 @@ import {
 } from '../services/FinanceService';
 import { parseMoney, parseInteger, parseEnum, parseISODate, parseUUID, optionalUUID } from '../utils/validators';
 import { assertTenantOwnership } from '../utils/tenantOwnership';
+import { withTenantContext } from '../config/tenantDb';
 
 const router = Router();
 router.use(authenticateToken, tenantIsolation);
@@ -39,16 +40,23 @@ router.post('/bank-accounts', wrap(async (req, res) => {
   if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
   const type  = parseEnum(req.body.type ?? 'CHECKING', ALLOWED, 'type');
   const color = req.body.color ?? '#10b981';
-  // initial_balance pode ser negativo (overdraft)
   const initial_balance = req.body.initial_balance == null
     ? 0
     : parseMoney(req.body.initial_balance, { min: -9_999_999.99, max: 99_999_999.99, field: 'initial_balance', allowZero: true });
-  const r = await query(
-    `INSERT INTO bank_accounts (tenant_id, name, type, color, bank_name, description, initial_balance)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-    [tid(req), name, type, color, req.body.bank_name ?? null, req.body.description ?? null, initial_balance]
-  );
-  res.status(201).json({ account: r.rows[0] });
+
+  // 🔒 C4 PILOTO: o tenant_id ainda é gravado explicitamente (a coluna é NOT
+  // NULL), mas a policy WITH CHECK do RLS rejeita o INSERT se o valor não
+  // bater com current_tenant_id() — defesa nativa do banco contra forja de
+  // tenant via payload manipulado.
+  const account = await withTenantContext(tid(req), async (client) => {
+    const r = await client.query(
+      `INSERT INTO bank_accounts (tenant_id, name, type, color, bank_name, description, initial_balance)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [tid(req), name, type, color, req.body.bank_name ?? null, req.body.description ?? null, initial_balance]
+    );
+    return r.rows[0];
+  });
+  res.status(201).json({ account });
 }));
 
 router.put('/bank-accounts/:id', wrap(async (req, res) => {
@@ -162,9 +170,12 @@ router.get('/transactions', wrap(async (req, res) => {
     page = '1', limit = '50',
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = ['ft.tenant_id = $1'];
-  const params: any[] = [tid(req)];
-  let i = 2;
+  // 🔒 C4 PILOTO: filtro de tenant agora vem do RLS — note a ausência de
+  // `AND ft.tenant_id = $X`. Se o RLS estiver inativo ou o GUC não estiver
+  // setado, current_tenant_id() retorna NULL e a policy nega TODAS as linhas.
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let i = 1;
 
   if (type)               { conditions.push(`ft.type = $${i++}`);                params.push(type); }
   if (status)             { conditions.push(`ft.status = $${i++}`);              params.push(status); }
@@ -173,32 +184,39 @@ router.get('/transactions', wrap(async (req, res) => {
   if (start_date)         { conditions.push(`ft.due_date >= $${i++}`);           params.push(start_date); }
   if (end_date)           { conditions.push(`ft.due_date <= $${i++}`);           params.push(end_date); }
 
-  const offset = (parseInt(page) - 1) * parseInt(limit);
-  const where = conditions.join(' AND ');
+  conditions.push(`ft.status != 'cancelled'`);
+  const where = `WHERE ${conditions.join(' AND ')}`;
 
-  const [rows, cnt] = await Promise.all([
-    query(
-      `SELECT ft.*,
-              ba.name  AS bank_account_name,
-              coa.name AS chart_of_account_name,
-              cc.name  AS cost_center_name
-       FROM financial_transactions ft
-       LEFT JOIN bank_accounts    ba  ON ba.id  = ft.bank_account_id
-       LEFT JOIN chart_of_accounts coa ON coa.id = ft.chart_of_account_id
-       LEFT JOIN cost_centers     cc  ON cc.id  = ft.cost_center_id
-       WHERE ${where} AND ft.status != 'cancelled'
-       ORDER BY ft.due_date DESC, ft.created_at DESC
-       LIMIT $${i} OFFSET $${i+1}`,
-      [...params, parseInt(limit), offset]
-    ),
-    query(`SELECT COUNT(*) FROM financial_transactions ft WHERE ${where} AND ft.status != 'cancelled'`, params),
-  ]);
+  const pageNum  = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+  const offset   = (pageNum - 1) * limitNum;
+
+  const { rows, total } = await withTenantContext(tid(req), async (client) => {
+    const [r, c] = await Promise.all([
+      client.query(
+        `SELECT ft.*,
+                ba.name  AS bank_account_name,
+                coa.name AS chart_of_account_name,
+                cc.name  AS cost_center_name
+         FROM financial_transactions ft
+         LEFT JOIN bank_accounts    ba  ON ba.id  = ft.bank_account_id
+         LEFT JOIN chart_of_accounts coa ON coa.id = ft.chart_of_account_id
+         LEFT JOIN cost_centers     cc  ON cc.id  = ft.cost_center_id
+         ${where}
+         ORDER BY ft.due_date DESC, ft.created_at DESC
+         LIMIT $${i} OFFSET $${i+1}`,
+        [...params, limitNum, offset]
+      ),
+      client.query(`SELECT COUNT(*) FROM financial_transactions ft ${where}`, params),
+    ]);
+    return { rows: r, total: parseInt(c.rows[0].count, 10) };
+  });
 
   res.json({
     transactions: rows.rows,
-    total: parseInt(cnt.rows[0].count),
-    page: parseInt(page),
-    limit: parseInt(limit),
+    total,
+    page: pageNum,
+    limit: limitNum,
   });
 }));
 
@@ -231,14 +249,21 @@ router.post('/transactions', wrap(async (req, res) => {
   if (cost_center_id)      await assertTenantOwnership('cost_centers',      cost_center_id,      tid(req), 'cost_center');
   if (contact_id)          await assertTenantOwnership('customers',         contact_id,          tid(req), 'contact');
 
+  const competence_date = req.body.competence_date != null
+    ? parseISODate(req.body.competence_date, 'competence_date') : undefined;
+  const payment_date    = req.body.payment_date != null
+    ? parseISODate(req.body.payment_date,    'payment_date')    : undefined;
+  const category = req.body.category != null
+    ? String(req.body.category).slice(0, 100) : undefined;
+
   const data: TransactionInput = {
     type, description, amount, due_date, status,
     installments, recurrent, recurrent_months,
     bank_account_id, chart_of_account_id, cost_center_id, contact_id,
-    competence_date: req.body.competence_date,
-    payment_date:    req.body.payment_date,
-    tags:    Array.isArray(req.body.tags) ? req.body.tags.slice(0, 20).map(String) : [],
-    category: req.body.category,
+    competence_date, payment_date, category,
+    tags: Array.isArray(req.body.tags)
+      ? req.body.tags.slice(0, 20).map((t: any) => String(t).slice(0, 50))
+      : [],
   };
 
   const created = await createTransaction(tid(req), data);
@@ -285,8 +310,19 @@ router.put('/transactions/:id', wrap(async (req, res) => {
     if (!d || d.length > 255) return res.status(400).json({ error: 'description inválido' });
     req.body.description = d;
   }
-  if (req.body.tags !== undefined && !Array.isArray(req.body.tags)) {
-    return res.status(400).json({ error: 'tags deve ser array' });
+  if (req.body.tags !== undefined) {
+    if (!Array.isArray(req.body.tags)) return res.status(400).json({ error: 'tags deve ser array' });
+    req.body.tags = req.body.tags.slice(0, 20).map((t: any) => String(t).slice(0, 50));
+  }
+  if (req.body.attachment_url !== undefined && req.body.attachment_url !== null) {
+    const url = String(req.body.attachment_url);
+    if (!/^https?:\/\//i.test(url) || url.length > 500) {
+      return res.status(400).json({ error: 'attachment_url deve ser http(s) e ter no máximo 500 caracteres' });
+    }
+    req.body.attachment_url = url;
+  }
+  if (req.body.category !== undefined && req.body.category !== null) {
+    req.body.category = String(req.body.category).slice(0, 100);
   }
 
   const allowed = ['description', 'amount', 'due_date', 'competence_date',

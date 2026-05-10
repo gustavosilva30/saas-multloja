@@ -1,24 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Phone, QrCode, LogOut, CheckCircle2, AlertCircle, Loader2, MessageCircle } from 'lucide-react';
-
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
+import { apiFetch } from '@/lib/api';
 
 export function WhatsApp() {
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'connecting' | 'loading'>('loading');
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const token = localStorage.getItem('auth_token');
-
   const fetchStatus = async () => {
     try {
-      const res = await fetch(`${API}/api/whatsapp/status`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStatus(data.status === 'open' ? 'connected' : 'disconnected');
-      }
+      const data = await apiFetch<{ status: string }>('/api/whatsapp/status');
+      setStatus(data.status === 'open' ? 'connected' : 'disconnected');
     } catch (error) {
       console.error('Error fetching status:', error);
     }
@@ -26,7 +18,6 @@ export function WhatsApp() {
 
   useEffect(() => {
     fetchStatus();
-    // Poll status if disconnected and we have a qrcode visible
     let interval: any;
     if (status === 'disconnected' || status === 'connecting') {
       interval = setInterval(fetchStatus, 5000);
@@ -38,35 +29,24 @@ export function WhatsApp() {
     setLoading(true);
     setStatus('connecting');
     try {
-      const res = await fetch(`${API}/api/whatsapp/connect`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.code) {
-        setQrCode(data.code);
-      }
+      const data = await apiFetch<{ code?: string }>('/api/whatsapp/connect', { method: 'POST' });
+      if (data.code) setQrCode(data.code);
     } catch (error) {
       console.error('Error connecting:', error);
       setStatus('disconnected');
-    }
-    setLoading(false);
+    } finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
     if (!confirm('Deseja realmente desconectar o WhatsApp?')) return;
     setLoading(true);
     try {
-      await fetch(`${API}/api/whatsapp/logout`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiFetch('/api/whatsapp/logout', { method: 'POST' });
       setStatus('disconnected');
       setQrCode(null);
     } catch (error) {
       console.error('Error logging out:', error);
-    }
-    setLoading(false);
+    } finally { setLoading(false); }
   };
 
   return (

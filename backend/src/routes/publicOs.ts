@@ -1,45 +1,44 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { param, body, validationResult } from 'express-validator';
-import { query, withTransaction, tenantContext } from '../config/database';
+import { query, withTransaction } from '../config/database';
 import { PoolClient } from 'pg';
 
 // Rota completamente pública — sem authenticateToken.
 // Acessada pelo cliente final via link único da OS.
-// Acessada pelo cliente final via link único da OS.
 const router = Router();
 
-const publicOsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,
-  message: { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+// 🔒 A5: Rate-limit no GET para evitar enumeração/scraping de tokens
+const viewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,                                                // 1 view a cada 15s em média
+  keyGenerator: (req) => `view|${req.ip}|${req.params.token}`,
+  message: { error: 'Muitas tentativas de visualização. Aguarde alguns minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-router.use(publicOsLimiter);
+// 🔒 A5: Rate-limit estrito no POST de aprovação — chave por IP+token
+const approveLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,                               // 1 hora
+  max: 10,
+  keyGenerator: (req) => `approve|${req.ip}|${req.params.token}`,
+  message: { error: 'Muitas tentativas de aprovação. Tente novamente mais tarde.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── GET /api/public/os/:token — visualização pública ─────────────────────────
 router.get(
   '/:token',
+  viewLimiter,
   param('token').isUUID(),
   async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
 
     try {
-      // 1. Descobrir o tenant_id associado ao token ignorando RLS
-      const tenantRes = await query(`SELECT get_tenant_by_os_token($1) as tenant_id`, [req.params.token]);
-      const tenantId = tenantRes.rows[0]?.tenant_id;
-
-      if (!tenantId) {
-        res.status(404).json({ error: 'Ordem de Serviço não encontrada' });
-        return;
-      }
-
-      // 2. Executar o restante com o contexto do tenant definido
-      await tenantContext.run({ tenantId }, async () => {
-        const osRes = await query(
+      const osRes = await query(
         `SELECT so.id, so.os_number, so.status, so.asset_metadata,
                 so.customer_notes, so.expected_at,
                 so.subtotal, so.discount, so.total,
@@ -63,7 +62,7 @@ router.get(
         `SELECT item_type, description, quantity, unit_price, discount, total_price
            FROM service_order_items
           WHERE os_id = $1
-          ORDER BY item_type DESC, created_at`,  // SERVICE primeiro
+          ORDER BY item_type DESC, created_at`,
         [os.id]
       );
 
@@ -84,7 +83,6 @@ router.get(
           items:         itemsRes.rows,
         },
       });
-      });
     } catch (err) {
       console.error('Public OS view error:', err);
       res.status(500).json({ error: 'Falha ao carregar OS' });
@@ -95,25 +93,15 @@ router.get(
 // ── POST /api/public/os/:token/approve — aprovação pelo cliente ───────────────
 router.post(
   '/:token/approve',
+  approveLimiter,
   param('token').isUUID(),
-  body('customer_signature').optional().isString(),  // opcional: nome confirmado
+  body('customer_signature').optional().isString().isLength({ max: 100 }),
   async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) { res.status(400).json({ errors: errors.array() }); return; }
 
     try {
-      // 1. Descobrir o tenant_id
-      const tenantRes = await query(`SELECT get_tenant_by_os_token($1) as tenant_id`, [req.params.token]);
-      const tenantId = tenantRes.rows[0]?.tenant_id;
-
-      if (!tenantId) {
-        res.status(404).json({ error: 'Ordem de Serviço não encontrada' });
-        return;
-      }
-
-      // 2. Executar com contexto
-      await tenantContext.run({ tenantId }, async () => {
-        await withTransaction(async (client: PoolClient) => {
+      await withTransaction(async (client: PoolClient) => {
         const osRes = await client.query(
           `SELECT id, tenant_id, status, os_number
              FROM service_orders
@@ -140,10 +128,13 @@ router.post(
           [os.id]
         );
 
-        // Registra no histórico sem user_id (aprovação externa)
-        const note = req.body.customer_signature
-          ? `Aprovado digitalmente por: ${req.body.customer_signature}`
-          : 'Aprovado digitalmente pelo cliente via link público';
+        // Forensics: registra IP + User-Agent na nota de aprovação
+        const sig = req.body.customer_signature ? String(req.body.customer_signature).slice(0, 100) : null;
+        const ua  = String(req.headers['user-agent'] || '').slice(0, 200);
+        const ip  = req.ip || 'unknown';
+        const note = sig
+          ? `Aprovado por: ${sig} | IP: ${ip} | UA: ${ua}`
+          : `Aprovação digital via link público | IP: ${ip} | UA: ${ua}`;
 
         await client.query(
           `INSERT INTO service_order_status_history
@@ -153,10 +144,7 @@ router.post(
         );
       });
 
-        });
-
-        res.json({ ok: true, message: 'Ordem de Serviço aprovada com sucesso!' });
-      });
+      res.json({ ok: true, message: 'Ordem de Serviço aprovada com sucesso!' });
     } catch (err: any) {
       console.error('Public OS approve error:', err);
       res.status(err.statusCode ?? 500).json({ error: err.message || 'Falha ao aprovar OS' });

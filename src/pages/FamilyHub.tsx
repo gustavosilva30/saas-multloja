@@ -6,8 +6,8 @@ import {
   Stethoscope, GraduationCap, PartyPopper, LayoutGrid,
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
-const tok = () => localStorage.getItem('auth_token') || '';
+import { apiFetch } from '@/lib/api';
+
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function useApi<T>(path: string, deps: any[] = []) {
@@ -16,24 +16,16 @@ function useApi<T>(path: string, deps: any[] = []) {
   const load = useCallback(async () => {
     if (!path) return;
     setLoading(true);
-    try {
-      const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${tok()}` } });
-      setData(await r.json());
-    } catch { /* ignore */ } finally { setLoading(false); }
+    try { setData(await apiFetch<T>(path)); }
+    catch { /* ignore */ }
+    finally { setLoading(false); }
   }, [path]);
   useEffect(() => { load(); }, deps);
   return { data, loading, reload: load };
 }
 
-async function api(method: string, path: string, body?: any) {
-  const r = await fetch(`${API}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok()}` },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!r.ok) throw new Error((await r.json()).error || 'Erro');
-  return r.json();
-}
+const api = (method: string, path: string, body?: any) =>
+  apiFetch(path, { method, body });
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ emoji, color, size = 'md', points }: {

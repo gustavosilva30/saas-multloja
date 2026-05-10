@@ -8,25 +8,22 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
+import { apiFetch } from '@/lib/api';
 
-const API = import.meta.env.VITE_API_URL || 'https://api.gsntech.com.br';
-const getToken = () => localStorage.getItem('auth_token') || '';
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function useApi<T>(path: string, deps: any[] = []) {
-  const token = getToken();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-      setData(await r.json());
+      setData(await apiFetch<T>(path));
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [path, token]);
+  }, [path]);
 
   useEffect(() => { load(); }, deps);
   return { data, loading, reload: load };
@@ -80,7 +77,6 @@ function NewTransactionModal({ onClose, onSaved, accounts, chartAccounts, costCe
   onClose: () => void; onSaved: () => void;
   accounts: Account[]; chartAccounts: ChartAccount[]; costCenters: CostCenter[];
 }) {
-  const token = getToken();
   const [form, setForm] = useState({
     type: 'income' as 'income' | 'expense',
     description: '', amount: '',
@@ -107,12 +103,7 @@ function NewTransactionModal({ onClose, onSaved, accounts, chartAccounts, costCe
         recurrent_months: form.recurrent ? parseInt(form.recurrent_months) : undefined,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       };
-      const r = await fetch(`${API}/api/finance/transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) throw new Error((await r.json()).error || 'Erro ao salvar');
+      await apiFetch('/api/finance/transactions', { method: 'POST', body });
       onSaved();
     } catch (e: any) { setErr(e.message); }
     finally { setSaving(false); }
@@ -256,19 +247,19 @@ function NewTransactionModal({ onClose, onSaved, accounts, chartAccounts, costCe
 function PayModal({ txId, onClose, onPaid, accounts }: {
   txId: string; onClose: () => void; onPaid: () => void; accounts: Account[];
 }) {
-  const token = getToken();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [accountId, setAccountId] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function pay() {
     setSaving(true);
-    await fetch(`${API}/api/finance/transactions/${txId}/pay`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ payment_date: date, bank_account_id: accountId || undefined }),
-    });
-    setSaving(false); onPaid();
+    try {
+      await apiFetch(`/api/finance/transactions/${txId}/pay`, {
+        method: 'PATCH',
+        body: { payment_date: date, bank_account_id: accountId || undefined },
+      });
+      onPaid();
+    } finally { setSaving(false); }
   }
 
   return (
@@ -301,7 +292,6 @@ function PayModal({ txId, onClose, onPaid, accounts }: {
 function OfxModal({ accounts, onClose, onImported }: {
   accounts: Account[]; onClose: () => void; onImported: () => void;
 }) {
-  const token = getToken();
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
@@ -314,11 +304,10 @@ function OfxModal({ accounts, onClose, onImported }: {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      const r = await fetch(`${API}/api/finance/bank-accounts/${accountId}/import-ofx`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
-      });
-      const json = await r.json();
-      if (!r.ok) throw new Error(json.error || 'Erro ao importar');
+      const json = await apiFetch<{ imported: number; skipped: number }>(
+        `/api/finance/bank-accounts/${accountId}/import-ofx`,
+        { method: 'POST', body: fd }
+      );
       setResult(json);
     } catch (e: any) { setErr(e.message); }
     finally { setLoading(false); }
@@ -372,7 +361,6 @@ function OfxModal({ accounts, onClose, onImported }: {
 
 // ── DRE Modal ─────────────────────────────────────────────────────────────────
 function DreModal({ onClose }: { onClose: () => void }) {
-  const token = getToken();
   const now = new Date();
   const [startDate, setStartDate] = useState(`${now.getFullYear()}-01-01`);
   const [endDate, setEndDate] = useState(now.toISOString().slice(0, 10));
@@ -381,10 +369,9 @@ function DreModal({ onClose }: { onClose: () => void }) {
 
   async function load() {
     setLoading(true);
-    const r = await fetch(`${API}/api/finance/reports/dre?start_date=${startDate}&end_date=${endDate}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setDre(await r.json()); setLoading(false);
+    try {
+      setDre(await apiFetch(`/api/finance/reports/dre?start_date=${startDate}&end_date=${endDate}`));
+    } finally { setLoading(false); }
   }
 
   useEffect(() => { load(); }, []);

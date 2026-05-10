@@ -346,39 +346,39 @@ function ProductDrawer({
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-zinc-50 w-full max-w-4xl max-h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden"
+        className="bg-zinc-50 w-full max-w-4xl h-[88vh] rounded-xl flex flex-col shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3.5 bg-white border-b border-zinc-200 shrink-0">
+          <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-zinc-200 shrink-0">
             <div className="flex items-center gap-3">
-              <button type="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-500">
-                <X size={18} />
+              <button type="button" onClick={onClose} className="p-1 rounded-md hover:bg-zinc-100 text-zinc-500">
+                <X size={17} />
               </button>
-              <h2 className="font-semibold text-zinc-800 text-[15px]">
+              <h2 className="font-semibold text-zinc-800 text-sm">
                 {product ? 'Edita um Produto' : 'Novo Produto'}
               </h2>
             </div>
             <button
               type="submit" disabled={saving}
-              className="px-5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+              className="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
             >
               {saving ? (uploading ? 'Enviando…' : 'Salvando…') : 'Salvar'}
             </button>
           </div>
 
           {error && (
-            <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-md px-4 py-2.5">
+            <div className="mx-5 mt-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-md px-4 py-2">
               {error}
             </div>
           )}
 
           {/* Body: side nav + content */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Side nav */}
-            <nav className="w-52 shrink-0 px-5 py-6 border-r border-zinc-200 bg-zinc-50">
-              <ul className="space-y-1">
+            <nav className="w-44 shrink-0 px-3 py-4 border-r border-zinc-200 bg-zinc-50">
+              <ul className="space-y-0.5">
                 {navItems.map(item => (
                   <li key={item.id}>
                     <button
@@ -399,38 +399,38 @@ function ProductDrawer({
             </nav>
 
             {/* Content */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
               {/* ── Card: Informações Gerais ────────────────────────── */}
               <section
                 ref={el => { sectionRefs.current.general = el; }}
-                className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
+                className="bg-white rounded-md border border-zinc-200 shadow-sm p-5"
               >
-                <h3 className="text-base font-semibold text-zinc-800 mb-5">Informações Gerais</h3>
+                <h3 className="text-sm font-semibold text-zinc-800 mb-4">Informações Gerais</h3>
 
-                <div className="flex gap-6">
+                <div className="flex gap-5">
                   {/* Image upload */}
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-40 h-40 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors shrink-0 overflow-hidden relative group"
+                    className="w-32 h-32 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition-colors shrink-0 overflow-hidden relative group"
                   >
                     {previewUrl ? (
                       <>
                         <img src={previewUrl} alt="" className="w-full h-full object-contain" />
-                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-1 text-xs text-zinc-600 border-t border-zinc-200 group-hover:bg-blue-50">
-                          Elige image
+                        <div className="absolute bottom-0 left-0 right-0 bg-white/90 text-center py-0.5 text-[11px] text-zinc-600 border-t border-zinc-200 group-hover:bg-blue-50">
+                          Trocar imagem
                         </div>
                       </>
                     ) : (
                       <>
-                        <ImageIcon size={28} className="text-zinc-300 mb-2" />
+                        <ImageIcon size={24} className="text-zinc-300 mb-1.5" />
                         <span className="text-xs text-zinc-500">Elige image</span>
                       </>
                     )}
                   </div>
                   <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-                  <div className="flex-1 space-y-4">
+                  <div className="flex-1 space-y-3">
                     <div ref={el => { sectionRefs.current.name = el; }}>
                       <label className={labelCls}>Nome do Produto</label>
                       <input
@@ -459,7 +459,7 @@ function ProductDrawer({
                           className={inputCls}
                         />
                         {margin !== null && (
-                          <p className={cn('text-xs mt-1', parseFloat(margin) >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                          <p className={cn('text-[11px] mt-0.5', parseFloat(margin) >= 0 ? 'text-emerald-600' : 'text-red-500')}>
                             Margem: {margin}%
                           </p>
                         )}
@@ -471,7 +471,7 @@ function ProductDrawer({
                       <textarea
                         value={form.description} onChange={set('description')}
                         rows={2}
-                        placeholder=""
+                        placeholder="Detalhes do produto…"
                         className={cn(inputCls, 'resize-none')}
                       />
                     </div>
@@ -538,11 +538,11 @@ function ProductDrawer({
               {/* ── Card: Configurações ─────────────────────────────── */}
               <section
                 ref={el => { sectionRefs.current.config = el; }}
-                className="bg-white rounded-md border border-zinc-200 shadow-sm p-6"
+                className="bg-white rounded-md border border-zinc-200 shadow-sm p-5"
               >
-                <h3 className="text-base font-semibold text-zinc-800 mb-5">Configurações</h3>
+                <h3 className="text-sm font-semibold text-zinc-800 mb-4">Configurações</h3>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className={labelCls}>SKU</label>
                     <input required value={form.sku} onChange={set('sku')} placeholder="GSN-001" className={inputCls} />
@@ -552,20 +552,20 @@ function ProductDrawer({
                     <input value={form.barcode} onChange={set('barcode')} placeholder="7891234567890" className={inputCls} />
                   </div>
                   <div>
+                    <label className={labelCls}>Unidade</label>
+                    <div className="relative">
+                      <select value={form.unit} onChange={set('unit')} className={cn(inputCls, 'appearance-none pr-8')}>
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div className="col-span-2">
                     <label className={labelCls}>Categoria</label>
                     <div className="relative">
                       <select value={form.category_id} onChange={set('category_id')} className={cn(inputCls, 'appearance-none pr-8')}>
                         <option value="">Sem categoria</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Unidade</label>
-                    <div className="relative">
-                      <select value={form.unit} onChange={set('unit')} className={cn(inputCls, 'appearance-none pr-8')}>
-                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                       </select>
                       <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
                     </div>
@@ -578,10 +578,9 @@ function ProductDrawer({
                     <label className={labelCls}>Estoque Inicial</label>
                     <input type="number" min="0" value={form.stock_quantity} onChange={set('stock_quantity')} className={inputCls} />
                   </div>
-                  <div>
-                    <label className={labelCls}>Estoque Mínimo</label>
+                  <div className="col-span-2">
+                    <label className={labelCls}>Estoque Mínimo <span className="text-zinc-400 font-normal">(alerta)</span></label>
                     <input type="number" min="0" value={form.min_stock} onChange={set('min_stock')} className={inputCls} />
-                    <p className="text-xs text-zinc-400 mt-1">Alerta abaixo desta quantidade</p>
                   </div>
                 </div>
               </section>

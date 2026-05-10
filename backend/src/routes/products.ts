@@ -65,19 +65,40 @@ router.get(
       );
       const total = parseInt(countResult.rows[0].count);
 
-      // Get products
+      // Get products with their images
       const productsResult = await query(
-        `SELECT p.*, c.name as category_name 
+        `SELECT p.*, c.name as category_name,
+                COALESCE(
+                  jsonb_agg(
+                    jsonb_build_object(
+                      'id', pi.id,
+                      'image_url', pi.image_url,
+                      'sort_order', pi.sort_order,
+                      'is_primary', pi.is_primary
+                    ) ORDER BY pi.sort_order ASC
+                  ) FILTER (WHERE pi.id IS NOT NULL),
+                  '[]'::jsonb
+                ) as images,
+                (SELECT image_url FROM product_images WHERE product_id = p.id AND is_primary = true LIMIT 1) as primary_image,
+                (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY sort_order ASC LIMIT 1) as first_image
          FROM products p
          LEFT JOIN categories c ON p.category_id = c.id
+         LEFT JOIN product_images pi ON pi.product_id = p.id
          ${whereClause}
+         GROUP BY p.id, c.name
          ORDER BY p.created_at DESC
          LIMIT $${paramIndex + 1} OFFSET $${paramIndex + 2}`,
         [...params, limit, offset]
       );
 
+      // Transform rows to include image_url for backwards compatibility
+      const products = productsResult.rows.map(p => ({
+        ...p,
+        image_url: p.primary_image || p.first_image || p.image_url,
+      }));
+
       res.json({
-        products: productsResult.rows,
+        products,
         pagination: {
           page,
           limit,
@@ -123,10 +144,23 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const productId = req.params.id;
 
     const result = await query(
-      `SELECT p.*, c.name as category_name 
+      `SELECT p.*, c.name as category_name,
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_object(
+                    'id', pi.id,
+                    'image_url', pi.image_url,
+                    'sort_order', pi.sort_order,
+                    'is_primary', pi.is_primary
+                  ) ORDER BY pi.sort_order ASC
+                ) FILTER (WHERE pi.id IS NOT NULL),
+                '[]'::jsonb
+              ) as images
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = $1 AND p.tenant_id = $2`,
+       LEFT JOIN product_images pi ON pi.product_id = p.id
+       WHERE p.id = $1 AND p.tenant_id = $2
+       GROUP BY p.id, c.name`,
       [productId, tenantId]
     );
 
@@ -135,7 +169,13 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    res.json({ product: result.rows[0] });
+    const product = result.rows[0];
+    // Backwards compatibility
+    const primaryImage = product.images?.find((i: any) => i.is_primary);
+    const firstImage = product.images?.[0];
+    product.image_url = primaryImage?.image_url || firstImage?.image_url || product.image_url;
+
+    res.json({ product });
   } catch (error) {
     console.error('Get product error:', error);
     res.status(500).json({ error: 'Failed to get product' });
@@ -174,6 +214,7 @@ router.post(
         unit,
         barcode,
         image_url,
+        images, // Array of image URLs
       } = req.body;
 
       // Auto-generate sequential SKU if not supplied
@@ -193,29 +234,52 @@ router.post(
         return;
       }
 
-      const result = await query(
-        `INSERT INTO products 
-         (tenant_id, name, sku, description, category_id, cost_price, sale_price, 
-          stock_quantity, min_stock, unit, barcode, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING *`,
-        [
-          tenantId,
-          name,
-          sku,
-          description,
-          category_id,
-          cost_price || 0,
-          sale_price,
-          stock_quantity || 0,
-          min_stock || 0,
-          unit || 'UN',
-          barcode,
-          image_url,
-        ]
-      );
+      // Insert product within transaction
+      const newProduct = await withTransaction(async (client) => {
+        // Insert product
+        const productResult = await client.query(
+          `INSERT INTO products 
+           (tenant_id, name, sku, description, category_id, cost_price, sale_price, 
+            stock_quantity, min_stock, unit, barcode, image_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING *`,
+          [
+            tenantId,
+            name,
+            sku,
+            description,
+            category_id,
+            cost_price || 0,
+            sale_price,
+            stock_quantity || 0,
+            min_stock || 0,
+            unit || 'UN',
+            barcode,
+            image_url,
+          ]
+        );
 
-      res.status(201).json({ product: result.rows[0] });
+        const product = productResult.rows[0];
+
+        // Insert images if provided (max 10)
+        if (images && Array.isArray(images) && images.length > 0) {
+          const limitedImages = images.slice(0, 10);
+          for (let i = 0; i < limitedImages.length; i++) {
+            const img = limitedImages[i];
+            if (img && img.image_url) {
+              await client.query(
+                `INSERT INTO product_images (product_id, tenant_id, image_url, sort_order, is_primary)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [product.id, tenantId, img.image_url, i, i === 0] // First image is primary
+              );
+            }
+          }
+        }
+
+        return product;
+      });
+
+      res.status(201).json({ product: newProduct });
     } catch (error) {
       console.error('Create product error:', error);
       res.status(500).json({ error: 'Failed to create product' });
@@ -259,6 +323,8 @@ router.put(
       const values: any[] = [];
       let paramIndex = 0;
 
+      const { images } = req.body; // Array of images to update
+
       const fields = [
         'name',
         'sku',
@@ -280,23 +346,61 @@ router.put(
           updates.push(`${field} = $${paramIndex}`);
           values.push(req.body[field]);
         }
-      });
+      })
 
       if (updates.length === 0) {
-        res.status(400).json({ error: 'No fields to update' });
-        return;
+        // Handle images update if provided
+        if (images !== undefined && Array.isArray(images)) {
+          await withTransaction(async (client) => {
+            // Delete existing images
+            await client.query(
+              'DELETE FROM product_images WHERE product_id = $1 AND tenant_id = $2',
+              [productId, tenantId]
+            );
+
+            // Insert new images (max 10)
+            const limitedImages = images.slice(0, 10);
+            for (let i = 0; i < limitedImages.length; i++) {
+              const img = limitedImages[i];
+              if (img && img.image_url) {
+                await client.query(
+                  `INSERT INTO product_images (product_id, tenant_id, image_url, sort_order, is_primary)
+                   VALUES ($1, $2, $3, $4, $5)`,
+                  [productId, tenantId, img.image_url, i, i === 0]
+                );
+              }
+            }
+          });
+        }
+
+        paramIndex++;
+        updates.push(`updated_at = $${paramIndex}`);
+        values.push(new Date());
+
+        paramIndex++;
+        values.push(productId);
+
+        const result = await query(
+          `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} RETURNING *`,
+          [...values, tenantId]
+        );
+
+        res.json({ product: result.rows[0] });
+      } else {
+        paramIndex++;
+        updates.push(`updated_at = $${paramIndex}`);
+        values.push(new Date());
+
+        paramIndex++;
+        values.push(productId);
+
+        const result = await query(
+          `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramIndex} AND tenant_id = $${paramIndex + 1} RETURNING *`,
+          [...values, tenantId]
+        );
+
+        res.json({ product: result.rows[0] });
       }
-
-      paramIndex++;
-      values.push(productId);
-
-      const result = await query(
-        `UPDATE products SET ${updates.join(', ')}, updated_at = NOW() 
-         WHERE id = $${paramIndex} RETURNING *`,
-        values
-      );
-
-      res.json({ product: result.rows[0] });
     } catch (error) {
       console.error('Update product error:', error);
       res.status(500).json({ error: 'Failed to update product' });

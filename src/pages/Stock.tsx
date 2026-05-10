@@ -322,9 +322,10 @@ function ProductDrawer({
       .catch(() => {});
   }, [product]);
   const [error, setError] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(product?.image_url ?? null);
-  const [uploading, setUploading] = useState(false);
+  const [images, setImages] = useState<{ id?: string; image_url: string; is_primary?: boolean }[]>(
+    product?.images || (product?.image_url ? [{ image_url: product.image_url, is_primary: true }] : [])
+  );
+  const [uploadingImages, setUploadingImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const margin = (() => {
@@ -341,14 +342,68 @@ function ProductDrawer({
   const setMeta = (key: string, value: string) =>
     setForm(prev => ({ ...prev, metadata: { ...prev.metadata, [key]: value } }));
 
-  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setError('Selecione uma imagem válida'); return; }
-    if (file.size > 5 * 1024 * 1024) { setError('Imagem muito grande. Máximo 5MB'); return; }
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Check total limit (max 10 images)
+    const remainingSlots = 10 - images.length;
+    const filesToProcess = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      setError(`Limite de 10 imagens atingido. Apenas ${remainingSlots} imagem(s) adicionada(s).`);
+    }
+
+    // Validate files
+    const invalidFiles = filesToProcess.filter(f => !f.type.startsWith('image/'));
+    if (invalidFiles.length > 0) {
+      setError('Apenas imagens são permitidas (JPG, PNG, GIF)');
+      return;
+    }
+
+    const oversizedFiles = filesToProcess.filter(f => f.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      setError('Imagens devem ter no máximo 5MB cada');
+      return;
+    }
+
     setError('');
+
+    // Upload each file
+    for (const file of filesToProcess) {
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      setUploadingImages(prev => [...prev, tempId]);
+
+      try {
+        const result = await uploadApi.upload(file);
+        setImages(prev => [...prev, { id: tempId, image_url: result.url, is_primary: prev.length === 0 }]);
+      } catch (err) {
+        setError(`Erro ao enviar ${file.name}`);
+      } finally {
+        setUploadingImages(prev => prev.filter(id => id !== tempId));
+      }
+    }
+
+    // Clear input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => {
+      const newImages = prev.filter((_, i) => i !== index);
+      // Ensure at least one image is primary
+      if (newImages.length > 0 && !newImages.some(img => img.is_primary)) {
+        newImages[0].is_primary = true;
+      }
+      return newImages;
+    });
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setImages(prev => prev.map((img, i) => ({
+      ...img,
+      is_primary: i === index
+    })));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -357,15 +412,8 @@ function ProductDrawer({
     setSaving(true);
     try {
       let imageUrl = form.image_url;
-      if (selectedFile) {
-        setUploading(true);
-        try {
-          const r = await uploadApi.upload(selectedFile);
-          imageUrl = r.url;
-        } catch (uploadErr) {
-          console.warn('Upload falhou, salvando produto sem imagem:', uploadErr);
-        }
-        setUploading(false);
+      if (images.length > 0) {
+        imageUrl = images.find(img => img.is_primary)?.image_url;
       }
       const body = {
         name: form.name,
@@ -379,6 +427,7 @@ function ProductDrawer({
         min_stock: parseInt(form.min_stock) || 0,
         unit: form.unit,
         image_url: imageUrl || undefined,
+        images: images.map(img => ({ image_url: img.image_url, is_primary: img.is_primary })),
         metadata: Object.keys(form.metadata).length > 0 ? form.metadata : undefined,
       };
       if (product) {
@@ -392,7 +441,6 @@ function ProductDrawer({
       setError(err instanceof Error ? err.message : 'Erro ao salvar');
     }
     setSaving(false);
-    setUploading(false);
   };
 
   const inputCls = 'w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all';
@@ -468,65 +516,145 @@ function ProductDrawer({
                 <h3 className="text-sm font-semibold text-zinc-800 mb-5">Informações Gerais</h3>
 
                 <div className="flex gap-5 mb-4">
-                  {/* Image upload */}
-                  <div className="shrink-0 space-y-2">
-                    <div
-                      className="w-36 h-36 rounded-md border border-zinc-200 bg-zinc-50 flex flex-col items-center justify-center overflow-hidden relative group"
-                    >
-                      {previewUrl ? (
-                        <>
-                          <img
-                            src={previewUrl}
-                            alt=""
-                            onClick={() => setImageLightbox(true)}
-                            className="w-full h-full object-contain cursor-zoom-in"
-                          />
-                        </>
-                      ) : (
-                        <div
+                  {/* Images upload - up to 10 images */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                        Imagens do Produto ({images.length}/10)
+                      </label>
+                      {images.length < 10 && (
+                        <button
+                          type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-100 transition-colors"
+                          className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                         >
-                          <ImageIcon size={26} className="text-zinc-300 mb-1.5" />
-                          <span className="text-xs text-zinc-500">Adicionar imagem</span>
-                        </div>
+                          <Upload size={12} /> Adicionar
+                        </button>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-36 px-2 py-1.5 rounded-md border border-zinc-200 text-xs text-zinc-600 hover:bg-zinc-50 flex items-center justify-center gap-1.5"
-                    >
-                      <Upload size={12} /> {previewUrl ? 'Trocar' : 'Enviar imagem'}
-                    </button>
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+
+                    {/* Images grid */}
+                    {images.length > 0 ? (
+                      <div className="grid grid-cols-5 gap-2">
+                        {images.map((img, index) => (
+                          <div
+                            key={img.id || index}
+                            className={cn(
+                              "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                              img.is_primary ? "border-emerald-500 ring-2 ring-emerald-100" : "border-zinc-200 dark:border-zinc-700"
+                            )}
+                          >
+                            <img
+                              src={img.image_url}
+                              alt={`Imagem ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+
+                            {/* Uploading overlay */}
+                            {uploadingImages.includes(img.id || '') && (
+                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <RefreshCw size={16} className="text-white animate-spin" />
+                              </div>
+                            )}
+
+                            {/* Hover actions */}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                              {!img.is_primary && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPrimaryImage(index)}
+                                  className="px-2 py-1 bg-white rounded text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                                >
+                                  Principal
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="px-2 py-1 bg-red-500 rounded text-xs font-medium text-white hover:bg-red-600"
+                              >
+                                Remover
+                              </button>
+                            </div>
+
+                            {/* Primary badge */}
+                            {img.is_primary && (
+                              <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded">
+                                PRINCIPAL
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add more button (if under limit) */}
+                        {images.length < 10 && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="aspect-square rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center transition-colors"
+                          >
+                            <Plus size={20} className="text-zinc-400" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      /* Empty state upload area */
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full h-32 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-zinc-50 dark:bg-zinc-800/50 flex flex-col items-center justify-center gap-2 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
+                          <ImageIcon size={20} className="text-zinc-500 dark:text-zinc-400" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Clique para adicionar imagens</p>
+                          <p className="text-xs text-zinc-400">Máximo 10 imagens (JPG, PNG, GIF até 5MB)</p>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Hidden file input - multiple */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+
+                    <p className="text-xs text-zinc-400">
+                      A primeira imagem é definida como principal automaticamente. Passe o mouse sobre uma imagem para defini-la como principal ou removê-la.
+                    </p>
                   </div>
 
-                  <div className="flex-1 space-y-3">
+                  {/* Form fields */}
+                  <div className="flex-1 space-y-4">
                     <div>
-                      <label className={labelCls}>Nome do Produto</label>
+                      <label className={labelCls}>Nome do produto *</label>
                       <input
-                        required value={form.name} onChange={set('name')}
-                        placeholder="Ex: Pastilha de Freio Pro"
+                        value={form.name} onChange={set('name')}
+                        placeholder="Ex: Camisa Polo Azul"
                         className={inputCls}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={labelCls}>Fabricante</label>
+                        <label className={labelCls}>Preço de venda *</label>
                         <input
-                          value={form.metadata.fabricante ?? ''}
-                          onChange={e => setMeta('fabricante', e.target.value)}
-                          placeholder="Marca"
+                          type="number" step="0.01" min="0"
+                          value={form.sale_price} onChange={set('sale_price')}
+                          placeholder="0,00"
                           className={inputCls}
                         />
                       </div>
                       <div>
-                        <label className={labelCls}>Preço <span className="text-zinc-400 font-normal">(R$)</span></label>
+                        <label className={labelCls}>Preço de custo</label>
                         <input
-                          required type="number" step="0.01" min="0"
-                          value={form.sale_price} onChange={set('sale_price')}
+                          type="number" step="0.01" min="0"
+                          value={form.cost_price} onChange={set('cost_price')}
                           placeholder="0,00"
                           className={inputCls}
                         />

@@ -4,7 +4,21 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pecas\\\\OneDrive\\\\Área de Trabalho\\\\projetos futuros\\\\saas multloja\" -Recurse -Force)",
       "Bash(Select-Object FullName)",
       "Bash(ConvertTo-Csv -NoTypeInformation)",
-      "Bash(Out-String)"
+      "Bash(Out-String)",
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npm install *)",
+      "Bash(git commit *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\pecas\\\\OneDrive\\\\Área de Trabalho\\\\projetos futuros\\\\saas multloja\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30)",
+      "Bash(Format-Table FullName)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "PowerShell(Invoke-RestMethod -Uri \"https://api.gsntech.com.br/api/admin/seed\" -Method POST -ContentType \"application/json\" -Body '{\"email\":\"guga.b.139935@gmail.com\",\"password\":\"admin123456\",\"full_name\":\"Gustavo\"}')",
+      "Bash(node -e \"require\\('axios'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('react:', p.dependencies.react, 'typescript:', p.devDependencies?.typescript\\)\")"
     ]
   }
 }

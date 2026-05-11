@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Users, Plus, CheckCircle2, Circle, Target, Calendar, ArrowRight,
-  Wallet, TrendingUp, Star, ChevronRight, X, Trophy, Heart,
+  Wallet, TrendingUp, Star, ChevronRight, ChevronLeft, X, Trophy, Heart,
   Baby, Crown, UserRound, Sparkles, ShoppingCart, Home, Car,
   Stethoscope, GraduationCap, PartyPopper, LayoutGrid, Pencil, Trash2,
 } from 'lucide-react';
@@ -684,24 +684,24 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const d = new Date(selectedMonth + '-01');
+                    const d = new Date(selectedMonth + '-01T12:00:00');
                     d.setMonth(d.getMonth() - 1);
                     setSelectedMonth(d.toISOString().slice(0, 7));
                   }}
-                  className="p-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-violet-600 transition-colors">
-                  <ChevronRight size={16} className="rotate-180" />
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white shadow-sm border border-slate-200 text-slate-400 hover:text-violet-600 hover:border-violet-200 transition-all active:scale-90">
+                  <ChevronLeft size={20} />
                 </button>
-                <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 font-bold text-slate-700 text-sm capitalize">
-                  {new Date(selectedMonth + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                <div className="bg-white px-5 py-2 rounded-xl shadow-sm border border-slate-200 font-bold text-slate-700 text-sm capitalize min-w-[140px] text-center">
+                  {new Date(selectedMonth + '-01T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                 </div>
                 <button
                   onClick={() => {
-                    const d = new Date(selectedMonth + '-01');
+                    const d = new Date(selectedMonth + '-01T12:00:00');
                     d.setMonth(d.getMonth() + 1);
                     setSelectedMonth(d.toISOString().slice(0, 7));
                   }}
-                  className="p-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-violet-600 transition-colors">
-                  <ChevronRight size={16} />
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-white shadow-sm border border-slate-200 text-slate-400 hover:text-violet-600 hover:border-violet-200 transition-all active:scale-90">
+                  <ChevronRight size={20} />
                 </button>
               </div>
               <button onClick={() => setModal('expense')}
@@ -732,21 +732,38 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
             {/* Lista de despesas */}
             <div className="space-y-2">
               {expenses.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-sm">Nenhuma despesa este mês.</div>
+                <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200">
+                  <div className="text-3xl mb-2">💸</div>
+                  <p className="text-sm font-bold text-slate-400">Nenhuma despesa para este mês.</p>
+                </div>
               ) : expenses.map((e: any) => {
                 const Icon = CAT_ICONS[e.category] || Wallet;
                 const color = CAT_COLORS[e.category] || '#6b7280';
                 return (
-                  <div key={e.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-slate-100 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: color + '18' }}>
-                      <Icon size={16} style={{ color }} />
+                  <div key={e.id} className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: color + '12', border: `1px solid ${color}22` }}>
+                      <Icon size={22} style={{ color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700 truncate">{e.description}</p>
-                      <p className="text-xs text-slate-400">{e.avatar_emoji} {e.paid_by_name} · {new Date(e.expense_date).toLocaleDateString('pt-BR')}</p>
+                      <p className="text-sm font-bold text-slate-800 truncate">{e.description}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                          {e.avatar_emoji} {e.paid_by_name || 'Membro'}
+                        </span>
+                        <span className="text-[11px] text-slate-300">•</span>
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(e.expense_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </span>
+                        {e.is_recurrent && (
+                          <span className="text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Recorrente</span>
+                        )}
+                      </div>
                     </div>
-                    <span className="font-bold text-slate-800 text-sm whitespace-nowrap">{fmt(Number(e.amount))}</span>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 text-base">{fmt(Number(e.amount))}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{e.split_type === 'EQUAL' ? 'Divisão Igual' : 'Divisão Proporcional'}</p>
+                    </div>
                   </div>
                 );
               })}

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, ReactNode, useEffect, useCallback 
 import { apiFetch, getAccessToken } from '@/lib/api';
 
 export type Niche = 'varejo' | 'oficina' | 'clinica' | 'restaurante' | null;
-export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check' | 'whatsapp_integration' | 'family_hub';
+export type ModuleId = 'dashboard' | 'pos' | 'stock' | 'customers' | 'services' | 'finance' | 'modules' | 'settings' | 'catalog' | 'events' | 'automations' | 'ai_assistant' | 'ecommerce' | 'marketing' | 'delivery' | 'image_editor' | 'messages' | 'calendar' | 'freight_quote' | 'credit_check' | 'plate_check' | 'bin_check' | 'whatsapp_integration' | 'family_hub' | 'file_converter';
 
 interface TenantState {
   themeColor: string;

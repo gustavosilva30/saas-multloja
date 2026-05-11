@@ -5,7 +5,7 @@ import {
   Bell, Search, Moon, Sun, Monitor, Component, Wrench, FileSearch,
   Ticket, Zap, Mic, Store, Megaphone, Smartphone, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone, Heart,
+  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone, Heart, FileText,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
@@ -62,6 +62,7 @@ const ALL_GROUPS: NavGroup[] = [
       { id: 'messages', icon: MessageSquare, label: 'Recados', path: '/messages' },
       { id: 'calendar', icon: CalendarDays, label: 'Calendário', path: '/calendar' },
       { id: 'image_editor', icon: ImageIcon, label: 'Editor Imagem', path: '/image-editor' },
+      { id: 'file_converter', icon: FileText, label: 'Conversor Arquivos', path: '/file-converter' },
       { id: 'whatsapp_integration', icon: Phone, label: 'WhatsApp', path: '/whatsapp' },
     ],
   },

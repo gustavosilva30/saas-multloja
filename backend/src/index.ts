@@ -34,6 +34,7 @@ import eventRoutes from './routes/events';
 import financeRoutes from './routes/finance';
 import familyRoutes from './routes/family';
 import ecommerceRoutes from './routes/ecommerce';
+import convertRoutes from './routes/convert';
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/family', familyRoutes);
 app.use('/api/ecommerce', ecommerceRoutes);
+app.use('/api/convert', convertRoutes);
 app.use('/ml', ecommerceRoutes); // Suporte para /ml/callback
 app.use('/api/mercadolivre/auth', ecommerceRoutes); // Suporte para /api/mercadolivre/auth/callback
 

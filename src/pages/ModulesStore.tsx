@@ -4,7 +4,7 @@ import {
   Store, BarChart3, ShoppingCart, Box, Users, Wrench, Settings, Package,
   Megaphone, Smartphone, FileSearch, Ticket, Zap, Mic, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  X, CheckCircle2, Clock, Loader2, ShoppingBag, Check, Phone,
+  X, CheckCircle2, Clock, Loader2, ShoppingBag, Check, Phone, FileText,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
@@ -15,7 +15,7 @@ const MODULE_ICONS: Record<string, ElementType> = {
   delivery: Smartphone, image_editor: ImageIcon, messages: MessageSquare,
   calendar: CalendarDays, freight_quote: Truck, credit_check: ShieldCheck,
   plate_check: CarFront, bin_check: CreditCard, modules: Package, settings: Settings,
-  whatsapp_integration: Phone,
+  whatsapp_integration: Phone, file_converter: FileText,
 };
 
 interface CatalogModule {

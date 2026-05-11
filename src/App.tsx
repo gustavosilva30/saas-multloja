@@ -25,6 +25,7 @@ import { CreditCheck } from './pages/CreditCheck';
 import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
 import { WhatsApp } from './pages/WhatsApp';
+import { FileConverter } from './pages/FileConverter';
 import { OsPublicView } from './pages/OsPublicView';
 import { EventScanner } from './pages/EventScanner';
 import { Login } from './pages/Login';
@@ -74,6 +75,7 @@ function RouterConfig() {
         <Route path="/marketing" element={<ProtectedRoute minimumRoleLevel={3}><Marketing /></ProtectedRoute>} />
         <Route path="/delivery" element={<ProtectedRoute minimumRoleLevel={3}><Delivery /></ProtectedRoute>} />
         <Route path="/image-editor" element={<ProtectedRoute minimumRoleLevel={2}><ImageEditor /></ProtectedRoute>} />
+        <Route path="/file-converter" element={<ProtectedRoute minimumRoleLevel={2}><FileConverter /></ProtectedRoute>} />
         <Route path="/messages" element={<ProtectedRoute minimumRoleLevel={2}><Messages /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute minimumRoleLevel={2}><Calendar /></ProtectedRoute>} />
         <Route path="/freight-quote" element={<ProtectedRoute minimumRoleLevel={2}><FreightQuote /></ProtectedRoute>} />

@@ -47,14 +47,15 @@ INSERT INTO module_catalog (module_id, name, description, category, price, is_fr
   ('marketing',    'Marketing SMS/Email',  'Automações de recuperação de clientes e promoções', 'Marketing',  49.90, false, 12),
   ('delivery',     'App de Entregadores',  'Roteirização e aplicativo exclusivo para motoboys', 'Logística',  59.90, false, 13),
   ('image_editor', 'Editor de Imagens',    'Criação de artes e banners para redes sociais', 'Marketing',     19.90, false, 14),
-  ('messages',     'Recados Internos',     'Comunicação entre membros da equipe', 'Operação',                 0.00,  true,  15),
-  ('calendar',     'Calendário',           'Agendamentos e compromissos da equipe', 'Operação',               0.00,  true,  16),
-  ('freight_quote','Simulador de Frete',   'Cotação de frete com múltiplas transportadoras', 'Logística',    19.90, false, 17),
-  ('credit_check', 'Consulta SCPC/Serasa', 'Análise de crédito de clientes antes da venda', 'Vendas',       29.90, false, 18),
-  ('plate_check',  'Consulta de Placa',    'Informações completas de veículos pela placa', 'Operação',      19.90, false, 19),
-  ('bin_check',    'Consulta BIN',         'Identificação de cartões de crédito/débito', 'Vendas',          19.90, false, 20),
-  ('modules',      'App Store',            'Marketplace de módulos e configurações', 'Gestão',               0.00,  true,  21),
-  ('settings',     'Ajustes',              'Configurações gerais do sistema', 'Gestão',                      0.00,  true,  22)
+  ('file_converter','Conversor de Arquivos','Conversão rápida de PDF, Word e Imagens sem sair do sistema', 'Ferramentas', 19.90, false, 15),
+  ('messages',     'Recados Internos',     'Comunicação entre membros da equipe', 'Operação',                 0.00,  true,  16),
+  ('calendar',     'Calendário',           'Agendamentos e compromissos da equipe', 'Operação',               0.00,  true,  17),
+  ('freight_quote','Simulador de Frete',   'Cotação de frete com múltiplas transportadoras', 'Logística',    19.90, false, 18),
+  ('credit_check', 'Consulta SCPC/Serasa', 'Análise de crédito de clientes antes da venda', 'Vendas',       29.90, false, 19),
+  ('plate_check',  'Consulta de Placa',    'Informações completas de veículos pela placa', 'Operação',      19.90, false, 20),
+  ('bin_check',    'Consulta BIN',         'Identificação de cartões de crédito/débito', 'Vendas',          19.90, false, 21),
+  ('modules',      'App Store',            'Marketplace de módulos e configurações', 'Gestão',               0.00,  true,  22),
+  ('settings',     'Ajustes',              'Configurações gerais do sistema', 'Gestão',                      0.00,  true,  23)
 ON CONFLICT (module_id) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_module_catalog_is_active ON module_catalog(is_active);

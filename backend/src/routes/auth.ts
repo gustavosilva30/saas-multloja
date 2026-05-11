@@ -46,7 +46,7 @@ function setRefreshCookie(res: Response, refreshToken: string): void {
   res.cookie(REFRESH_COOKIE, refreshToken, {
     httpOnly: true,
     secure:   config.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path:     '/api/auth',                       // só vai para rotas de auth
     maxAge:   7 * 24 * 60 * 60 * 1000,
   });
@@ -56,7 +56,7 @@ function clearRefreshCookie(res: Response): void {
   res.clearCookie(REFRESH_COOKIE, {
     httpOnly: true,
     secure:   config.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path:     '/api/auth',
   });
 }

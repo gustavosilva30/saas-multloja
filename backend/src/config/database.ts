@@ -281,8 +281,14 @@ export async function query(text: string, params?: any[]) {
   if (context?.tenantId) {
     const client = await pool.connect();
     try {
+      await client.query('BEGIN');
       await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [context.tenantId]);
-      return await client.query(text, params);
+      const res = await client.query(text, params);
+      await client.query('COMMIT');
+      return res;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
     } finally {
       client.release();
     }

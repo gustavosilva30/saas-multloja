@@ -79,7 +79,9 @@ router.put('/', async (req: Request, res: Response): Promise<void> => {
     if (modules.length > 0) {
       await query(`
         INSERT INTO tenant_modules (tenant_id, module_id, is_active, payment_status, activated_at)
-        SELECT $1, unnest($2::text[]), true, 'free', NOW()
+        SELECT $1, m.module_id, true, 'free', NOW()
+        FROM unnest($2::text[]) as m_id
+        JOIN module_catalog m ON m.module_id = m_id
         ON CONFLICT (tenant_id, module_id)
         DO UPDATE SET is_active = true, activated_at = NOW()
         WHERE tenant_modules.payment_status = 'free' OR tenant_modules.payment_status IS NULL

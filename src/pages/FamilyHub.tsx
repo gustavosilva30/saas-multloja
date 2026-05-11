@@ -174,13 +174,20 @@ const EMOJIS = ['😊','👨','👩','👦','👧','🧑','👴','👵','🐶','
 const COLORS = ['#10b981','#6366f1','#ec4899','#f59e0b','#3b82f6','#ef4444','#8b5cf6','#06b6d4'];
 
 function NewMemberModal({ groupId, onClose, onSaved }: { groupId: string; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: '', role: 'ADULT', avatar_emoji: '😊', avatar_color: '#10b981', income_share: '50', phone: '' });
+  const [form, setForm] = useState({ name: '', role: 'ADULT', avatar_emoji: '😊', avatar_color: '#10b981', income_share: '50', monthly_income: '', phone: '' });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
-    try { await api('POST', `/api/family/groups/${groupId}/members`, { ...form, income_share: parseFloat(form.income_share) }); onSaved(); }
+    try { 
+      await api('POST', `/api/family/groups/${groupId}/members`, { 
+        ...form, 
+        income_share: parseFloat(form.income_share),
+        monthly_income: parseFloat(form.monthly_income || '0')
+      }); 
+      onSaved(); 
+    }
     finally { setSaving(false); }
   }
   return (
@@ -219,9 +226,14 @@ function NewMemberModal({ groupId, onClose, onSaved }: { groupId: string; onClos
               <option value="CHILD">Criança</option>
             </select>
           </div>
-          <div><Label c="% da renda" />
-            <input type="number" min="0" max="100" value={form.income_share} onChange={e => set('income_share', e.target.value)} className={inp} />
+          <div><Label c="Renda Mensal (R$)" />
+            <input type="number" step="0.01" value={form.monthly_income} onChange={e => set('monthly_income', e.target.value)}
+              className={inp} placeholder="0,00" />
           </div>
+        </div>
+
+        <div><Label c="% da renda (para divisão proporcional)" />
+          <input type="number" min="0" max="100" value={form.income_share} onChange={e => set('income_share', e.target.value)} className={inp} />
         </div>
 
         <div><Label c="WhatsApp (opcional)" />
@@ -519,10 +531,97 @@ function NewGoalModal({ groupId, onClose, onSaved }: { groupId: string; onClose:
   );
 }
 
-// ── Dashboard Familiar ────────────────────────────────────────────────────────
+// ── Edit Member Modal ─────────────────────────────────────────────────────────
+function EditMemberModal({ groupId, member, onClose, onSaved }: { groupId: string; member: any; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ 
+    name: member.name, 
+    role: member.role, 
+    avatar_emoji: member.avatar_emoji, 
+    avatar_color: member.avatar_color, 
+    income_share: String(member.income_share), 
+    monthly_income: String(member.monthly_income || ''), 
+    phone: member.phone || '' 
+  });
+  const [saving, setSaving] = useState(false);
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    try { 
+      await api('PUT', `/api/family/groups/${groupId}/members/${member.id}`, { 
+        ...form, 
+        income_share: parseFloat(form.income_share),
+        monthly_income: parseFloat(form.monthly_income || '0')
+      }); 
+      onSaved(); 
+    } finally { setSaving(false); }
+  }
+
+  async function remove() {
+    if (!confirm('Deseja realmente remover este membro?')) return;
+    await api('DELETE', `/api/family/groups/${groupId}/members/${member.id}`);
+    onSaved();
+  }
+
+  return (
+    <Modal title="Editar Membro" onClose={onClose}>
+      <form onSubmit={save} className="px-5 pb-5 space-y-4">
+        {/* Avatar */}
+        <div>
+          <Label c="Avatar" />
+          <div className="flex flex-wrap gap-2 mb-2">
+            {EMOJIS.map(e => (
+              <button key={e} type="button" onClick={() => set('avatar_emoji', e)}
+                className={`w-9 h-9 rounded-xl text-xl flex items-center justify-center transition-all ${form.avatar_emoji === e ? 'ring-2 ring-violet-500 bg-violet-50 scale-110' : 'hover:bg-slate-100'}`}>
+                {e}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {COLORS.map(c => (
+              <button key={c} type="button" onClick={() => set('avatar_color', c)}
+                className={`w-6 h-6 rounded-full transition-all ${form.avatar_color === c ? 'ring-2 ring-offset-1 ring-slate-400 scale-125' : ''}`}
+                style={{ background: c }} />
+            ))}
+          </div>
+        </div>
+
+        <div><Label c="Nome *" />
+          <input required value={form.name} onChange={e => set('name', e.target.value)} className={inp} placeholder="Nome do membro" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label c="Perfil" />
+            <select value={form.role} onChange={e => set('role', e.target.value)}
+              className={inp + ' cursor-pointer'}>
+              <option value="ADMIN">Admin</option>
+              <option value="ADULT">Adulto</option>
+              <option value="CHILD">Criança</option>
+            </select>
+          </div>
+          <div><Label c="Renda Mensal (R$)" />
+            <input type="number" step="0.01" value={form.monthly_income} onChange={e => set('monthly_income', e.target.value)}
+              className={inp} placeholder="0,00" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <button type="button" onClick={remove}
+            className="py-3 rounded-2xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 font-bold text-sm transition-colors flex items-center justify-center gap-2">
+            <Trash2 size={16} /> Remover
+          </button>
+          <button type="submit" disabled={saving}
+            className="py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm disabled:opacity-50 transition-colors">
+            {saving ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: string }) {
   const [tab, setTab] = useState<'home' | 'wallet' | 'tasks' | 'calendar'>('home');
-  const [modal, setModal] = useState<'member' | 'expense' | 'task' | 'event' | 'goal' | null>(null);
+  const [modal, setModal] = useState<'member' | 'expense' | 'task' | 'event' | 'goal' | { type: 'edit_member'; data: any } | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const { data: dash, reload } = useApi<any>(`/api/family/groups/${groupId}/dashboard`, [groupId]);
   const { data: expData, reload: reloadExp } = useApi<any>(`/api/family/groups/${groupId}/expenses?month=${selectedMonth}`, [tab === 'wallet', groupId, selectedMonth]);
@@ -570,7 +669,8 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
         {members.length > 0 && (
           <div className="flex gap-3 mt-4 overflow-x-auto pb-1">
             {members.map((m: any) => (
-              <div key={m.id} className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div key={m.id} onClick={() => setModal({ type: 'edit_member', data: m } as any)}
+                className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer hover:scale-105 transition-transform">
                 <Avatar emoji={m.avatar_emoji} color={m.avatar_color} size="md" points={m.points} />
                 <span className="text-[10px] text-slate-600 font-medium">{m.name.split(' ')[0]}</span>
                 <RoleBadge role={m.role} />
@@ -708,6 +808,61 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                 className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
                 <Plus size={14} /> Registrar Despesa
               </button>
+            </div>
+
+            {/* ── CARD DE SALDO MENSAL (NOVO) ── */}
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 overflow-hidden relative">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo da Família</p>
+                  <h3 className="text-2xl font-black text-slate-900">{fmt(settlement?.balance_remaining || 0)}</h3>
+                </div>
+                <div className={`p-3 rounded-2xl ${ (settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' }`}>
+                  <TrendingUp size={24} className={(settlement?.balance_remaining || 0) < 0 ? 'rotate-180' : ''} />
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-slate-500 font-medium">Orçamento Utilizado</span>
+                    <span className="font-bold text-slate-700">
+                      {Math.round(((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-1000 ${
+                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.9 ? 'bg-rose-500' : 
+                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Renda</p>
+                    <p className="text-sm font-black text-slate-700">{fmt(settlement?.total_income || 0)}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Gastos</p>
+                    <p className="text-sm font-black text-slate-700">{fmt(settlement?.total_expenses || 0)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dica de Saúde Financeira */}
+              <div className="mt-4 pt-4 border-t border-slate-50 flex items-start gap-3">
+                <div className="text-xl">💡</div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  {(settlement?.balance_remaining || 0) > 0 
+                    ? `Parabéns! Vocês economizaram ${fmt(settlement?.balance_remaining || 0)} este mês. Que tal investir em uma meta?`
+                    : "Atenção! Os gastos superaram a renda. Revisem as despesas de lazer para o próximo mês."
+                  }
+                </p>
+              </div>
             </div>
 
             {/* Acerto do mês */}
@@ -864,6 +1019,14 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
       {modal === 'task'    && <NewTaskModal    groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); reloadTasks(); }} />}
       {modal === 'event'   && <NewEventModal   groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reloadEvents(); }} />}
       {modal === 'goal'    && <NewGoalModal    groupId={groupId} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); }} />}
+      {typeof modal === 'object' && modal?.type === 'edit_member' && (
+        <EditMemberModal 
+          groupId={groupId} 
+          member={modal.data} 
+          onClose={() => setModal(null)} 
+          onSaved={() => { setModal(null); reload(); }} 
+        />
+      )}
     </div>
   );
 }

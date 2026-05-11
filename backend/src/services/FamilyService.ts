@@ -12,14 +12,25 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
 
   // Busca membros ativos do grupo
   const membersRes = await query(
-    `SELECT id, name, income_share FROM family_members
+    `SELECT id, name, income_share, monthly_income FROM family_members
      WHERE group_id = $1 AND tenant_id = $2 AND is_active = true`,
     [groupId, tenantId]
   );
   const members = membersRes.rows;
-  if (members.length < 2) return { members, settlements: [], total_expenses: 0, period: month };
+  
+  const totalFamilyIncome = members.reduce((s, m) => s + Number(m.monthly_income), 0);
+  const totalIncomeShare = members.reduce((s, m) => s + Number(m.income_share), 0) || 100;
 
-  const totalIncome = members.reduce((s, m) => s + Number(m.income_share), 0) || 100;
+  if (members.length < 2) {
+    return { 
+      members: members.map(m => ({ ...m, balance: 0, status: 'even' })), 
+      settlements: [], 
+      total_expenses: 0, 
+      total_income: totalFamilyIncome,
+      balance_remaining: totalFamilyIncome,
+      period: month 
+    };
+  }
 
   // Busca despesas do período
   const expRes = await query(
@@ -55,7 +66,7 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
       members.forEach(m => { balance[m.id] -= share; });
     } else if (exp.split_type === 'PROPORTIONAL') {
       members.forEach(m => {
-        const pct = Number(m.income_share) / totalIncome;
+        const pct = Number(m.income_share) / totalIncomeShare;
         balance[m.id] -= amt * pct;
       });
     } else if (exp.split_type === 'CUSTOM') {
@@ -96,7 +107,14 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
     status: balance[m.id] > 0.01 ? 'creditor' : balance[m.id] < -0.01 ? 'debtor' : 'even',
   }));
 
-  return { members: memberBalances, settlements, total_expenses: totalExpenses, period: month };
+  return { 
+    members: memberBalances, 
+    settlements, 
+    total_expenses: totalExpenses, 
+    total_income: totalFamilyIncome,
+    balance_remaining: totalFamilyIncome - totalExpenses,
+    period: month 
+  };
 }
 
 // ── Cron: Resumo diário WhatsApp ──────────────────────────────────────────────

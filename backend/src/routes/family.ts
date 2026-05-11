@@ -89,6 +89,7 @@ router.post('/groups/:groupId/members', wrap(async (req, res) => {
   if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
   const role = parseEnum(req.body.role ?? 'ADULT', ALLOWED_ROLE, 'role');
   const income_share = req.body.income_share == null ? 50 : parseMoney(req.body.income_share, { min: 0, max: 100, field: 'income_share', allowZero: true });
+  const monthly_income = parseMoney(req.body.monthly_income ?? 0, { field: 'monthly_income', allowZero: true });
   const avatar_color = req.body.avatar_color ?? '#10b981';
   const avatar_emoji = req.body.avatar_emoji ?? '😊';
   const phone = req.body.phone ?? null;
@@ -105,9 +106,9 @@ router.post('/groups/:groupId/members', wrap(async (req, res) => {
 
   const r = await query(
     `INSERT INTO family_members
-       (group_id, tenant_id, name, role, pin_code, avatar_color, avatar_emoji, income_share, phone)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, name, role, avatar_color, avatar_emoji, points, income_share, phone`,
-    [gid(req), tid(req), name, role, hashedPin, avatar_color, avatar_emoji, income_share, phone]
+       (group_id, tenant_id, name, role, pin_code, avatar_color, avatar_emoji, income_share, phone, monthly_income)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, name, role, avatar_color, avatar_emoji, points, income_share, phone, monthly_income`,
+    [gid(req), tid(req), name, role, hashedPin, avatar_color, avatar_emoji, income_share, phone, monthly_income]
   );
   res.status(201).json({ member: r.rows[0] });
 }));
@@ -116,7 +117,7 @@ router.put('/groups/:groupId/members/:memberId', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
   const ALLOWED_ROLE = ['ADMIN', 'ADULT', 'CHILD'] as const;
 
-  let { name, role, avatar_color, avatar_emoji, income_share, phone } = req.body;
+  let { name, role, avatar_color, avatar_emoji, income_share, phone, monthly_income } = req.body;
   if (name !== undefined) {
     name = String(name).trim();
     if (!name || name.length > 100) return res.status(400).json({ error: 'name inválido (1-100 caracteres)' });
@@ -125,21 +126,25 @@ router.put('/groups/:groupId/members/:memberId', wrap(async (req, res) => {
   if (income_share !== undefined && income_share !== null) {
     income_share = parseMoney(income_share, { min: 0, max: 100, field: 'income_share', allowZero: true });
   }
+  if (monthly_income !== undefined && monthly_income !== null) {
+    monthly_income = parseMoney(monthly_income, { field: 'monthly_income', allowZero: true });
+  }
   if (phone !== undefined && phone !== null && String(phone).length > 20) {
     return res.status(400).json({ error: 'phone excede 20 caracteres' });
   }
 
   const r = await query(
     `UPDATE family_members SET
-       name         = COALESCE($1, name),
-       role         = COALESCE($2, role),
-       avatar_color = COALESCE($3, avatar_color),
-       avatar_emoji = COALESCE($4, avatar_emoji),
-       income_share = COALESCE($5, income_share),
-       phone        = COALESCE($6, phone)
-     WHERE id = $7 AND group_id = $8 AND tenant_id = $9
-     RETURNING id, name, role, avatar_color, avatar_emoji, points, income_share, phone`,
-    [name, role, avatar_color, avatar_emoji, income_share, phone, req.params.memberId, gid(req), tid(req)]
+       name           = COALESCE($1, name),
+       role           = COALESCE($2, role),
+       avatar_color   = COALESCE($3, avatar_color),
+       avatar_emoji   = COALESCE($4, avatar_emoji),
+       income_share   = COALESCE($5, income_share),
+       phone          = COALESCE($6, phone),
+       monthly_income = COALESCE($7, monthly_income)
+     WHERE id = $8 AND group_id = $9 AND tenant_id = $10
+     RETURNING id, name, role, avatar_color, avatar_emoji, points, income_share, phone, monthly_income`,
+    [name, role, avatar_color, avatar_emoji, income_share, phone, monthly_income, req.params.memberId, gid(req), tid(req)]
   );
   if (!r.rows.length) return res.status(404).json({ error: 'Membro não encontrado' });
   res.json({ member: r.rows[0] });
@@ -511,7 +516,7 @@ router.get('/groups/:groupId/dashboard', wrap(async (req, res) => {
   const weekEnd   = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   const [membersRes, goalsRes, tasksRes, eventsRes, settlementRes] = await Promise.all([
-    query(`SELECT id, name, role, avatar_color, avatar_emoji, points FROM family_members
+    query(`SELECT id, name, role, avatar_color, avatar_emoji, points, monthly_income, income_share FROM family_members
            WHERE group_id = $1 AND tenant_id = $2 AND is_active = true ORDER BY points DESC`,
       [gid(req), tid(req)]),
     query(`SELECT * FROM family_goals WHERE group_id = $1 AND tenant_id = $2 AND status = 'ACTIVE' ORDER BY created_at`,

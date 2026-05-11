@@ -3,7 +3,7 @@ import {
   Users, Plus, CheckCircle2, Circle, Target, Calendar, ArrowRight,
   Wallet, TrendingUp, Star, ChevronRight, X, Trophy, Heart,
   Baby, Crown, UserRound, Sparkles, ShoppingCart, Home, Car,
-  Stethoscope, GraduationCap, PartyPopper, LayoutGrid,
+  Stethoscope, GraduationCap, PartyPopper, LayoutGrid, Pencil, Trash2,
 } from 'lucide-react';
 
 import { apiFetch } from '@/lib/api';
@@ -139,6 +139,30 @@ function NewGroupModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         <button type="submit" disabled={saving}
           className="w-full py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm disabled:opacity-50 transition-colors">
           {saving ? 'Criando…' : 'Criar Grupo'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+// ── Edit Group Modal ──────────────────────────────────────────────────────────
+function EditGroupModal({ group, onClose, onSaved }: { group: any; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(group.name);
+  const [saving, setSaving] = useState(false);
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    try { await api('PUT', `/api/family/groups/${group.id}`, { name }); onSaved(); }
+    finally { setSaving(false); }
+  }
+  return (
+    <Modal title="Editar Grupo" onClose={onClose}>
+      <form onSubmit={save} className="px-5 pb-5 space-y-4">
+        <div><Label c="Nome do grupo" />
+          <input required value={name} onChange={e => setName(e.target.value)} className={inp} placeholder="Ex: Família Silva" />
+        </div>
+        <button type="submit" disabled={saving}
+          className="w-full py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm disabled:opacity-50 transition-colors">
+          {saving ? 'Salvando…' : 'Salvar Alterações'}
         </button>
       </form>
     </Modal>
@@ -785,9 +809,20 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
 // ── Main Export ───────────────────────────────────────────────────────────────
 export function FamilyHub() {
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<any | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null);
   const { data, reload } = useApi<any>('/api/family/groups');
   const groups = data?.groups || [];
+
+  async function handleDeleteGroup(id: string, name: string) {
+    if (!confirm(`Deseja excluir o grupo "${name}"? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await api('DELETE', `/api/family/groups/${id}`);
+      reload();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao excluir grupo');
+    }
+  }
 
   // Auto-select se só houver um grupo
   useEffect(() => {
@@ -835,30 +870,53 @@ export function FamilyHub() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {groups.map((g: any) => (
-            <button key={g.id} onClick={() => setSelectedGroup({ id: g.id, name: g.name })}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-left hover:shadow-md hover:border-violet-200 transition-all group">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-xl">👨‍👩‍👧</div>
-                  <div>
-                    <p className="font-bold text-slate-800">{g.name}</p>
-                    <p className="text-xs text-slate-400">{g.member_count || 0} membros</p>
+            <div key={g.id} className="relative group/card">
+              <button onClick={() => setSelectedGroup({ id: g.id, name: g.name })}
+                className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-left hover:shadow-md hover:border-violet-200 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-xl">👨‍👩‍👧</div>
+                    <div>
+                      <p className="font-bold text-slate-800">{g.name}</p>
+                      <p className="text-xs text-slate-400">{g.member_count || 0} membros</p>
+                    </div>
                   </div>
+                  <ChevronRight size={16} className="text-slate-300 group-hover/card:text-violet-500 transition-colors" />
                 </div>
-                <ChevronRight size={16} className="text-slate-300 group-hover:text-violet-500 transition-colors" />
+                <div className="flex gap-3 text-xs text-slate-400">
+                  <span className="flex items-center gap-1"><Users size={11} /> Família</span>
+                  <span className="flex items-center gap-1"><Star size={11} /> Gamificado</span>
+                  <span className="flex items-center gap-1"><Wallet size={11} /> Finanças</span>
+                </div>
+              </button>
+
+              {/* Botões de Ação */}
+              <div className="absolute top-4 right-10 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingGroup(g); }}
+                  className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                  title="Editar Grupo"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteGroup(g.id, g.name); }}
+                  className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                  title="Excluir Grupo"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              <div className="flex gap-3 text-xs text-slate-400">
-                <span className="flex items-center gap-1"><Users size={11} /> Família</span>
-                <span className="flex items-center gap-1"><Star size={11} /> Gamificado</span>
-                <span className="flex items-center gap-1"><Wallet size={11} /> Finanças</span>
-              </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
 
       {showNewGroup && (
         <NewGroupModal onClose={() => setShowNewGroup(false)} onSaved={() => { setShowNewGroup(false); reload(); }} />
+      )}
+      {editingGroup && (
+        <EditGroupModal group={editingGroup} onClose={() => setEditingGroup(null)} onSaved={() => { setEditingGroup(null); reload(); }} />
       )}
     </div>
   );

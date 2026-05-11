@@ -246,11 +246,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response): Promis
   console.log('[AuthRoute] GET /me - User:', req.user?.id, 'Tenant:', req.user?.tenant_id);
   try {
     const r = await query(
-      `SELECT u.id, u.email, u.full_name, u.role, u.tenant_id, u.created_at,
-              t.name as tenant_name, t.niche
-         FROM user_profiles u
-         JOIN tenants t ON u.tenant_id = t.id
-        WHERE u.id = $1`,
+      `SELECT * FROM get_user_me($1)`,
       [req.user!.id]
     );
     if (r.rows.length === 0) { res.status(404).json({ error: 'User not found' }); return; }

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Users, Plus, CheckCircle2, Circle, Target, Calendar, ArrowRight,
+  Users, Plus, CheckCircle2, Circle, Target, Calendar, ArrowRight, ArrowUpCircle,
   Wallet, TrendingUp, Star, ChevronRight, ChevronLeft, X, Trophy, Heart,
   Baby, Crown, UserRound, Sparkles, ShoppingCart, Home, Car,
-  Stethoscope, GraduationCap, PartyPopper, LayoutGrid, Pencil, Trash2,
+  Stethoscope, GraduationCap, PartyPopper, LayoutGrid, Pencil, Trash2, Settings,
 } from 'lucide-react';
 
 import { apiFetch } from '@/lib/api';
@@ -259,8 +259,8 @@ function NewMemberModal({ groupId, onClose, onSaved }: { groupId: string; onClos
 }
 
 // ── New Expense Modal ─────────────────────────────────────────────────────────
-function NewExpenseModal({ groupId, members, onClose, onSaved }: {
-  groupId: string; members: any[]; onClose: () => void; onSaved: () => void;
+function NewExpenseModal({ groupId, members, categories, onClose, onSaved, onManageCategories }: {
+  groupId: string; members: any[]; categories: any[]; onClose: () => void; onSaved: () => void; onManageCategories: () => void;
 }) {
   const [form, setForm] = useState({
     paid_by_member_id: members[0]?.id || '',
@@ -322,16 +322,31 @@ function NewExpenseModal({ groupId, members, onClose, onSaved }: {
           </div>
         </div>
         <div>
-          <Label c="Categoria" />
+          <div className="flex items-center justify-between mb-1">
+            <Label c="Categoria" />
+            <button type="button" onClick={onManageCategories} className="text-[10px] font-black text-violet-500 uppercase flex items-center gap-1 hover:text-violet-700 transition-colors">
+              <Settings size={10} /> Gerenciar
+            </button>
+          </div>
           <div className="grid grid-cols-4 gap-2">
             {Object.entries(CAT_ICONS).map(([cat, Icon]) => (
               <button key={cat} type="button" onClick={() => set('category', cat)}
-                className={`flex flex-col items-center py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex flex-col items-center py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
                   form.category === cat ? 'ring-2 scale-105' : 'hover:bg-slate-50'
                 }`}
                 style={{ color: form.category === cat ? CAT_COLORS[cat] : '#94a3b8', background: form.category === cat ? CAT_COLORS[cat] + '18' : undefined }}>
                 <Icon size={16} className="mb-1" />
                 {cat === 'HOUSING' ? 'Casa' : cat === 'TRANSPORT' ? 'Trans.' : cat === 'EDUCATION' ? 'Educ.' : cat === 'LEISURE' ? 'Lazer' : cat === 'HEALTH' ? 'Saúde' : cat === 'FOOD' ? 'Comida' : 'Geral'}
+              </button>
+            ))}
+            {categories.map((cat: any) => (
+              <button key={cat.id} type="button" onClick={() => set('category', cat.name)}
+                className={`flex flex-col items-center py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                  form.category === cat.name ? 'ring-2 scale-105' : 'hover:bg-slate-50'
+                }`}
+                style={{ color: form.category === cat.name ? cat.color : '#94a3b8', background: form.category === cat.name ? cat.color + '18' : undefined }}>
+                <Wallet size={16} className="mb-1" />
+                {cat.name}
               </button>
             ))}
           </div>
@@ -484,6 +499,66 @@ function NewEventModal({ groupId, members, onClose, onSaved }: {
   );
 }
 
+function NewIncomeModal({ groupId, members, onClose, onSaved }: { groupId: string; members: any[]; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ description: '', amount: '', income_date: new Date().toISOString().slice(0, 10), member_id: '', is_recurrent: false, recurrence_period: 'MONTHLY' });
+  const [saving, setSaving] = useState(false);
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    try { await api('POST', `/api/family/groups/${groupId}/incomes`, form); onSaved(); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal title="Registrar Renda 💎" onClose={onClose}>
+      <form onSubmit={save} className="px-5 pb-5 space-y-4">
+        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200">
+            <ArrowUpCircle size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Nova Entrada</p>
+            <p className="text-xs text-emerald-600 font-medium">Aumente o poder de compra da família</p>
+          </div>
+        </div>
+
+        <div><Label c="O que você recebeu? *" />
+          <input required value={form.description} onChange={e => set('description', e.target.value)} className={inp} placeholder="Ex: Salário, Bônus, Venda, Presente..." />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><Label c="Valor (R$) *" />
+            <input required type="number" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} className={inp + ' text-emerald-600 font-black'} placeholder="0,00" />
+          </div>
+          <div><Label c="Data do Recebimento" />
+            <input type="date" value={form.income_date} onChange={e => set('income_date', e.target.value)} className={inp} />
+          </div>
+        </div>
+        <div><Label c="Responsável pelo Recebimento" />
+          <select value={form.member_id} onChange={e => set('member_id', e.target.value)} className={inp + ' cursor-pointer'}>
+            <option value="">Família (Fundo Comum)</option>
+            {members.map(m => <option key={m.id} value={m.id}>{m.avatar_emoji} {m.name}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 group cursor-pointer hover:bg-white hover:border-emerald-200 transition-all"
+             onClick={() => set('is_recurrent', !form.is_recurrent)}>
+          <div className={`w-10 h-5 rounded-full relative transition-colors ${form.is_recurrent ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+            <div className={`w-4 h-4 bg-white rounded-full shadow absolute top-0.5 transition-all ${form.is_recurrent ? 'left-5' : 'left-0.5'}`} />
+          </div>
+          <div className="flex-1">
+            <label className="text-sm font-bold text-slate-700 cursor-pointer">Renda Recorrente</label>
+            <p className="text-[10px] text-slate-400">Repetir automaticamente todos os meses</p>
+          </div>
+        </div>
+        <button type="submit" disabled={saving}
+          className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-200 disabled:opacity-50 transition-all active:scale-[0.98]">
+          {saving ? 'Processando...' : 'Confirmar Entrada 🚀'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 // ── New Goal Modal ────────────────────────────────────────────────────────────
 function NewGoalModal({ groupId, onClose, onSaved }: { groupId: string; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ title: '', target_amount: '', target_date: '', emoji: '🎯', color: '#10b981' });
@@ -619,14 +694,95 @@ function EditMemberModal({ groupId, member, onClose, onSaved }: { groupId: strin
     </Modal>
   );
 }
+function CategoryModal({ groupId, onClose, onSaved }: { groupId: string; onClose: () => void; onSaved: () => void }) {
+  const { data: catsData, reload } = useApi<any>(`/api/family/groups/${groupId}/expense-categories`, [groupId]);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm] = useState({ name: '', icon: 'Wallet', color: '#6b7280' });
+  const [saving, setSaving] = useState(false);
+
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+
+  async function save(e: any) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editing) {
+        await api('PUT', `/api/family/groups/${groupId}/expense-categories/${editing.id}`, form);
+      } else {
+        await api('POST', `/api/family/groups/${groupId}/expense-categories`, form);
+      }
+      setForm({ name: '', icon: 'Wallet', color: '#6b7280' });
+      setEditing(null);
+      reload();
+      onSaved();
+    } finally { setSaving(false); }
+  }
+
+  async function remove(id: string) {
+    if (!confirm('Deseja excluir esta categoria?')) return;
+    await api('DELETE', `/api/family/groups/${groupId}/expense-categories/${id}`);
+    reload();
+    onSaved();
+  }
+
+  const categories = catsData?.categories || [];
+
+  return (
+    <Modal title="Categorias de Despesa 🏷️" onClose={onClose}>
+      <div className="px-5 pb-5 space-y-6">
+        <form onSubmit={save} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 space-y-3">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{editing ? 'Editando Categoria' : 'Nova Categoria'}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label c="Nome *" />
+              <input required value={form.name} onChange={e => set('name', e.target.value)} className={inp} placeholder="Ex: Mercado" />
+            </div>
+            <div><Label c="Cor" />
+              <input type="color" value={form.color} onChange={e => set('color', e.target.value)} className={inp + ' h-10 p-1'} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={saving} className="flex-1 py-3 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-lg shadow-slate-200">
+              {saving ? 'Processando...' : (editing ? 'Atualizar' : 'Adicionar')}
+            </button>
+            {editing && <button type="button" onClick={() => { setEditing(null); setForm({ name: '', icon: 'Wallet', color: '#6b7280' }); }} className="px-4 rounded-2xl bg-slate-200 text-slate-600 font-bold text-xs">Cancelar</button>}
+          </div>
+        </form>
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Minhas Categorias</p>
+          <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+            {categories.map((c: any) => (
+              <div key={c.id} className="flex items-center justify-between p-3 bg-white rounded-3xl border border-slate-100 group transition-all hover:border-violet-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm" style={{ background: c.color }}>
+                    <Wallet size={16} />
+                  </div>
+                  <span className="text-sm font-black text-slate-700">{c.name}</span>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setEditing(c); setForm({ name: c.name, icon: c.icon, color: c.color }); }} className="p-2 text-slate-400 hover:text-violet-600"><Pencil size={14} /></button>
+                  <button onClick={() => remove(c.id)} className="p-2 text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            ))}
+            {categories.length === 0 && <p className="text-xs text-slate-400 text-center py-4">Nenhuma categoria personalizada ainda.</p>}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: string }) {
   const [tab, setTab] = useState<'home' | 'wallet' | 'tasks' | 'calendar'>('home');
-  const [modal, setModal] = useState<'member' | 'expense' | 'task' | 'event' | 'goal' | { type: 'edit_member'; data: any } | null>(null);
+  const [modal, setModal] = useState<'member' | 'expense' | 'income' | 'task' | 'event' | 'goal' | 'category_mgmt' | { type: 'edit_member'; data: any } | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const { data: dash, reload } = useApi<any>(`/api/family/groups/${groupId}/dashboard`, [groupId]);
   const { data: expData, reload: reloadExp } = useApi<any>(`/api/family/groups/${groupId}/expenses?month=${selectedMonth}`, [tab === 'wallet', groupId, selectedMonth]);
+  const { data: incData, reload: reloadInc } = useApi<any>(`/api/family/groups/${groupId}/incomes?month=${selectedMonth}`, [tab === 'wallet', groupId, selectedMonth]);
   const { data: tasksData, reload: reloadTasks } = useApi<any>(`/api/family/groups/${groupId}/tasks`, [tab === 'tasks', groupId]);
   const { data: eventsData, reload: reloadEvents } = useApi<any>(`/api/family/groups/${groupId}/events`, [tab === 'calendar', groupId]);
+  const { data: catsData, reload: reloadCats } = useApi<any>(`/api/family/groups/${groupId}/expense-categories`, [groupId]);
 
   const members = dash?.members || [];
   const goals   = dash?.goals   || [];
@@ -634,6 +790,13 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
   const tasks   = tasksData?.tasks   || [];
   const events  = eventsData?.events || [];
   const settlement = dash?.settlement;
+  const categories = catsData?.categories || [];
+
+  const getCatMeta = (name: string) => {
+    const custom = categories.find((c: any) => c.name === name);
+    if (custom) return { color: custom.color, icon: Wallet }; // Could support dynamic icons later
+    return { color: CAT_COLORS[name] || '#6b7280', icon: CAT_ICONS[name] || Wallet };
+  };
 
   async function completeTask(taskId: string, memberId: string) {
     await api('PATCH', `/api/family/groups/${groupId}/tasks/${taskId}/complete`, { member_id: memberId });
@@ -659,10 +822,16 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">{members.length} membros</p>
           </div>
-          <button onClick={() => setModal('member')}
-            className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors">
-            <Plus size={14} /> Membro
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setModal('income')}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors">
+              <ArrowUpCircle size={14} /> Renda
+            </button>
+            <button onClick={() => setModal('member')}
+              className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors">
+              <Plus size={14} /> Membro
+            </button>
+          </div>
         </div>
 
         {/* Membros row */}
@@ -804,64 +973,119 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                   <ChevronRight size={20} />
                 </button>
               </div>
-              <button onClick={() => setModal('expense')}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
-                <Plus size={14} /> Registrar Despesa
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setModal('expense')}
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
+                  <Plus size={14} /> Despesa
+                </button>
+                <button onClick={() => setModal('income')}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
+                  <ArrowUpCircle size={14} /> Renda
+                </button>
+              </div>
             </div>
 
             {/* ── CARD DE SALDO MENSAL (NOVO) ── */}
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 overflow-hidden relative">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 overflow-hidden relative group">
+              {/* Background gradient effect */}
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-colors" />
+              <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-violet-500/5 rounded-full blur-3xl group-hover:bg-violet-500/10 transition-colors" />
+
+              <div className="flex items-center justify-between mb-6 relative">
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo da Família</p>
-                  <h3 className="text-2xl font-black text-slate-900">{fmt(settlement?.balance_remaining || 0)}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponível</p>
+                    <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase">Realtime</span>
+                  </div>
+                  <h3 className="text-3xl font-black text-slate-900 flex items-baseline gap-1">
+                    <span className="text-sm font-medium text-slate-400">R$</span>
+                    {Number(settlement?.balance_remaining || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </h3>
                 </div>
-                <div className={`p-3 rounded-2xl ${ (settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600' }`}>
+                <div className={`p-4 rounded-2xl shadow-sm transition-transform group-hover:scale-110 ${ (settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-rose-500 text-white shadow-rose-200' }`}>
                   <TrendingUp size={24} className={(settlement?.balance_remaining || 0) < 0 ? 'rotate-180' : ''} />
                 </div>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-5 relative">
                 <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-slate-500 font-medium">Orçamento Utilizado</span>
-                    <span className="font-bold text-slate-700">
+                  <div className="flex justify-between text-[11px] mb-2">
+                    <span className="text-slate-500 font-bold flex items-center gap-1.5">
+                      <LayoutGrid size={12} className="text-violet-400" /> 
+                      Uso do Orçamento
+                    </span>
+                    <span className={`font-black ${((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
                       {Math.round(((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) * 100)}%
                     </span>
                   </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-50">
                     <div 
-                      className={`h-full transition-all duration-1000 ${
-                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.9 ? 'bg-rose-500' : 
-                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.7 ? 'bg-amber-500' : 'bg-emerald-500'
+                      className={`h-full rounded-full transition-all duration-1000 relative ${
+                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.9 ? 'bg-gradient-to-r from-rose-400 to-rose-600' : 
+                        ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.7 ? 'bg-gradient-to-r from-amber-400 to-amber-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'
                       }`}
                       style={{ width: `${Math.min(100, ((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) * 100)}%` }}
-                    />
+                    >
+                      <div className="absolute top-0 right-0 bottom-0 w-1 bg-white/30 animate-pulse" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-1">
-                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Renda</p>
-                    <p className="text-sm font-black text-slate-700">{fmt(settlement?.total_income || 0)}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 hover:bg-white hover:shadow-md transition-all cursor-default">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">Total Recebido</p>
+                    <p className="text-lg font-black text-emerald-600">{fmt(settlement?.total_income || 0)}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <ArrowUpCircle size={10} className="text-emerald-400" />
+                      <span className="text-[9px] text-slate-400 font-medium">Este mês</span>
+                    </div>
                   </div>
-                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Total Gastos</p>
-                    <p className="text-sm font-black text-slate-700">{fmt(settlement?.total_expenses || 0)}</p>
+                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 hover:bg-white hover:shadow-md transition-all cursor-default">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">Total Gasto</p>
+                    <p className="text-lg font-black text-slate-800">{fmt(settlement?.total_expenses || 0)}</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <ShoppingCart size={10} className="text-rose-400" />
+                      <span className="text-[9px] text-slate-400 font-medium">Acumulado</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Dica de Saúde Financeira */}
-              <div className="mt-4 pt-4 border-t border-slate-50 flex items-start gap-3">
-                <div className="text-xl">💡</div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  {(settlement?.balance_remaining || 0) > 0 
-                    ? `Parabéns! Vocês economizaram ${fmt(settlement?.balance_remaining || 0)} este mês. Que tal investir em uma meta?`
-                    : "Atenção! Os gastos superaram a renda. Revisem as despesas de lazer para o próximo mês."
-                  }
-                </p>
+                {/* Mathematical Projections & Insights */}
+                <div className="pt-5 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-6 mb-5">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <TrendingUp size={10} /> Queima Diária
+                      </p>
+                      <p className="text-sm font-black text-slate-700">{fmt(settlement?.projections?.avg_daily_spend || 0)} <span className="text-[10px] text-slate-400 font-normal">/dia</span></p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Target size={10} /> Meta de Sobra
+                      </p>
+                      <p className={`text-sm font-black ${settlement?.projections?.is_warning ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {fmt(settlement?.projections?.projected_balance || 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className={`flex items-start gap-3 p-4 rounded-2xl border transition-all ${
+                    settlement?.projections?.is_warning 
+                      ? 'bg-rose-50 border-rose-100 text-rose-900 shadow-sm shadow-rose-100' 
+                      : 'bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm shadow-emerald-100'
+                  }`}>
+                    <div className="text-xl shrink-0">{settlement?.projections?.is_warning ? '⚠️' : '💎'}</div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-black uppercase tracking-tight">Análise Preditiva</p>
+                      <p className="text-[10px] leading-relaxed opacity-80">
+                        {settlement?.projections?.is_warning 
+                          ? `Atenção! No ritmo atual, o mês fechará no vermelho com ${fmt(settlement?.projections?.projected_balance || 0)}. Reduza o gasto diário em ${fmt(Math.abs(settlement?.projections?.avg_daily_spend * 0.15))} para equilibrar.`
+                          : `Excelente gestão! Vocês estão poupando ${Math.round((settlement?.balance_remaining / (settlement?.total_income || 1)) * 100)}% da renda total. Projeção de fechar com ${fmt(settlement?.projections?.projected_balance || 0)} livre.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -884,44 +1108,63 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
               </div>
             )}
 
-            {/* Lista de despesas */}
+            {/* Lista de Movimentações */}
             <div className="space-y-2">
-              {expenses.length === 0 ? (
+              {[...(expData?.expenses || []), ...(incData?.incomes || [])].length === 0 ? (
                 <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200">
                   <div className="text-3xl mb-2">💸</div>
-                  <p className="text-sm font-bold text-slate-400">Nenhuma despesa para este mês.</p>
+                  <p className="text-sm font-bold text-slate-400">Nenhuma movimentação para este mês.</p>
                 </div>
-              ) : expenses.map((e: any) => {
-                const Icon = CAT_ICONS[e.category] || Wallet;
-                const color = CAT_COLORS[e.category] || '#6b7280';
-                return (
-                  <div key={e.id} className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: color + '12', border: `1px solid ${color}22` }}>
-                      <Icon size={22} style={{ color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">{e.description}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                          {e.avatar_emoji} {e.paid_by_name || 'Membro'}
-                        </span>
-                        <span className="text-[11px] text-slate-300">•</span>
-                        <span className="text-[11px] text-slate-400">
-                          {new Date(e.expense_date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                        </span>
-                        {e.is_recurrent && (
-                          <span className="text-[10px] bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Recorrente</span>
-                        )}
+              ) : [...(expData?.expenses || []), ...(incData?.incomes || [])]
+                  .sort((a, b) => new Date((b.expense_date || b.income_date) + 'T12:00:00').getTime() - new Date((a.expense_date || a.income_date) + 'T12:00:00').getTime())
+                  .map((item: any) => {
+                    const isInc = !!item.income_date;
+                    const { icon: Icon, color } = isInc ? { icon: ArrowUpCircle, color: '#10b981' } : getCatMeta(item.category);
+                    return (
+                      <div key={item.id} className={`bg-white rounded-3xl px-5 py-5 shadow-sm border flex items-center gap-4 transition-all hover:shadow-lg group relative overflow-hidden ${isInc ? 'border-emerald-100' : 'border-slate-100'}`}>
+                        {isInc && <div className="absolute top-0 left-0 bottom-0 w-1 bg-emerald-500" />}
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 shadow-sm`}
+                          style={{ background: isInc ? '#10b98112' : color + '12', border: `1px solid ${isInc ? '#10b98122' : color + '22'}` }}>
+                          <Icon size={22} style={{ color: isInc ? '#10b981' : color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-black text-slate-800 truncate">{item.description}</p>
+                            {isInc && <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black px-1 rounded uppercase tracking-tighter">Entrada</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded-lg border border-slate-100">
+                              <span className="text-[10px]">{item.avatar_emoji}</span>
+                              <span className="text-[10px] text-slate-600 font-bold">{item.paid_by_name || item.member_name || 'Família'}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-300">•</span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {new Date((item.expense_date || item.income_date) + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-black text-lg ${isInc ? 'text-emerald-600' : 'text-slate-900'}`}>
+                            {isInc ? '+' : '-'}{fmt(Number(item.amount))}
+                          </p>
+                          <div className="flex items-center justify-end gap-2 mt-1">
+                            <p className={`text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded ${isInc ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                              {isInc ? 'Fundo Familiar' : (item.split_type === 'EQUAL' ? 'Divisão Igual' : 'Proporcional')}
+                            </p>
+                            <button onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Deseja excluir permanentemente esta movimentação?')) return;
+                              await api('DELETE', `/api/family/groups/${groupId}/${isInc ? 'incomes' : 'expenses'}/${item.id}`);
+                              isInc ? reloadInc() : reloadExp();
+                              reload();
+                            }} className="opacity-0 group-hover:opacity-100 text-rose-300 hover:text-rose-600 transition-all p-1">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-slate-900 text-base">{fmt(Number(e.amount))}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{e.split_type === 'EQUAL' ? 'Divisão Igual' : 'Divisão Proporcional'}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
             </div>
           </div>
         )}
@@ -1015,7 +1258,9 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
 
       {/* ── Modals ── */}
       {modal === 'member'  && <NewMemberModal  groupId={groupId} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); }} />}
-      {modal === 'expense' && <NewExpenseModal groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); reloadExp(); }} />}
+      {modal === 'expense' && <NewExpenseModal groupId={groupId} members={members} categories={categories} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); reloadExp(); }} onManageCategories={() => setModal('category_mgmt')} />}
+      {modal === 'category_mgmt' && <CategoryModal groupId={groupId} onClose={() => setModal('expense')} onSaved={() => reloadCats()} />}
+      {modal === 'income'  && <NewIncomeModal  groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); reloadInc(); }} />}
       {modal === 'task'    && <NewTaskModal    groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); reloadTasks(); }} />}
       {modal === 'event'   && <NewEventModal   groupId={groupId} members={members} onClose={() => setModal(null)} onSaved={() => { setModal(null); reloadEvents(); }} />}
       {modal === 'goal'    && <NewGoalModal    groupId={groupId} onClose={() => setModal(null)} onSaved={() => { setModal(null); reload(); }} />}

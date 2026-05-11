@@ -201,7 +201,7 @@ router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
   if (!description) return res.status(400).json({ error: 'description obrigatório' });
   if (description.length > 255) return res.status(400).json({ error: 'description excede 255 caracteres' });
 
-  const category   = parseEnum(req.body.category   ?? 'GENERAL', ALLOWED_CAT, 'category');
+  const category   = String(req.body.category || 'GENERAL').trim().slice(0, 50);
   const split_type = parseEnum(req.body.split_type ?? 'EQUAL',   ALLOWED_SPLIT, 'split_type');
   const expense_date = req.body.expense_date || new Date().toISOString().slice(0, 10);
   const receipt_url  = req.body.receipt_url ?? null;
@@ -257,6 +257,51 @@ router.delete('/groups/:groupId/expenses/:expenseId', wrap(async (req, res) => {
   await query(
     `DELETE FROM family_expenses WHERE id = $1 AND group_id = $2 AND tenant_id = $3`,
     [req.params.expenseId, gid(req), tid(req)]
+  );
+  res.json({ ok: true });
+}));
+
+// ── Incomes ───────────────────────────────────────────────────────────────────
+router.get('/groups/:groupId/incomes', wrap(async (req, res) => {
+  await validateGroup(gid(req), tid(req));
+  const { month } = req.query as Record<string, string>;
+  const conditions = [`group_id = $1`, `tenant_id = $2`];
+  const params: any[] = [gid(req), tid(req)];
+  if (month) {
+    conditions.push(`TO_CHAR(income_date, 'YYYY-MM') = $3`);
+    params.push(month);
+  }
+  const r = await query(
+    `SELECT i.*, fm.name AS member_name, fm.avatar_emoji
+     FROM family_incomes i
+     LEFT JOIN family_members fm ON fm.id = i.member_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY i.income_date DESC`,
+    params
+  );
+  res.json({ incomes: r.rows });
+}));
+
+router.post('/groups/:groupId/incomes', wrap(async (req, res) => {
+  await validateGroup(gid(req), tid(req));
+  const { amount, description, income_date, member_id, is_recurrent, recurrence_period } = req.body;
+  const val = parseMoney(amount, { field: 'amount' });
+  if (!description) return res.status(400).json({ error: 'description obrigatório' });
+  
+  const r = await query(
+    `INSERT INTO family_incomes
+       (group_id, tenant_id, member_id, amount, description, income_date, is_recurrent, recurrence_period)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+    [gid(req), tid(req), member_id || null, val, description, 
+     income_date || new Date().toISOString().slice(0, 10), !!is_recurrent, recurrence_period || null]
+  );
+  res.status(201).json({ income: r.rows[0] });
+}));
+
+router.delete('/groups/:groupId/incomes/:incomeId', wrap(async (req, res) => {
+  await query(
+    `DELETE FROM family_incomes WHERE id = $1 AND group_id = $2 AND tenant_id = $3`,
+    [req.params.incomeId, gid(req), tid(req)]
   );
   res.json({ ok: true });
 }));
@@ -507,7 +552,53 @@ router.delete('/groups/:groupId/events/:eventId', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// ── Dashboard (tudo em 1 request) ─────────────────────────────────────────────
+// ── Expense Categories ────────────────────────────────────────────────────────
+router.get('/groups/:groupId/expense-categories', wrap(async (req, res) => {
+  await validateGroup(gid(req), tid(req));
+  const r = await query(
+    `SELECT * FROM family_expense_categories WHERE group_id = $1 AND tenant_id = $2 AND is_active = true ORDER BY name`,
+    [gid(req), tid(req)]
+  );
+  res.json({ categories: r.rows });
+}));
+
+router.post('/groups/:groupId/expense-categories', wrap(async (req, res) => {
+  await validateGroup(gid(req), tid(req));
+  const { name, icon, color } = req.body;
+  if (!name) return res.status(400).json({ error: 'name obrigatório' });
+  
+  const r = await query(
+    `INSERT INTO family_expense_categories (group_id, tenant_id, name, icon, color)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [gid(req), tid(req), name, icon || 'Wallet', color || '#6b7280']
+  );
+  res.status(201).json({ category: r.rows[0] });
+}));
+
+router.put('/groups/:groupId/expense-categories/:categoryId', wrap(async (req, res) => {
+  await validateGroup(gid(req), tid(req));
+  const { name, icon, color } = req.body;
+  const r = await query(
+    `UPDATE family_expense_categories SET
+       name = COALESCE($1, name),
+       icon = COALESCE($2, icon),
+       color = COALESCE($3, color),
+       updated_at = NOW()
+     WHERE id = $4 AND group_id = $5 AND tenant_id = $6 RETURNING *`,
+    [name, icon, color, req.params.categoryId, gid(req), tid(req)]
+  );
+  if (!r.rows.length) return res.status(404).json({ error: 'Categoria não encontrada' });
+  res.json({ category: r.rows[0] });
+}));
+
+router.delete('/groups/:groupId/expense-categories/:categoryId', wrap(async (req, res) => {
+  await query(
+    `UPDATE family_expense_categories SET is_active = false WHERE id = $1 AND group_id = $2 AND tenant_id = $3`,
+    [req.params.categoryId, gid(req), tid(req)]
+  );
+  res.json({ ok: true });
+}));
+
 router.get('/groups/:groupId/dashboard', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
 

@@ -18,8 +18,18 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
   );
   const members = membersRes.rows;
   
-  const totalFamilyIncome = members.reduce((s, m) => s + Number(m.monthly_income), 0);
+  const baseIncome = members.reduce((s, m) => s + Number(m.monthly_income), 0);
   const totalIncomeShare = members.reduce((s, m) => s + Number(m.income_share), 0) || 100;
+
+  // Busca rendas dinâmicas do período
+  const incRes = await query(
+    `SELECT amount FROM family_incomes
+     WHERE group_id = $1 AND tenant_id = $2
+       AND income_date BETWEEN $3 AND $4`,
+    [groupId, tenantId, startDate, endDate]
+  );
+  const dynamicIncome = incRes.rows.reduce((s, r) => s + Number(r.amount), 0);
+  const totalFamilyIncome = baseIncome + dynamicIncome;
 
   if (members.length < 2) {
     return { 
@@ -34,7 +44,7 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
 
   // Busca despesas do período
   const expRes = await query(
-    `SELECT e.id, e.paid_by_member_id, e.amount, e.split_type,
+    `SELECT e.id, e.paid_by_member_id, e.amount, e.split_type, e.expense_date,
             COALESCE(
               json_agg(s) FILTER (WHERE s.id IS NOT NULL),
               '[]'
@@ -76,6 +86,17 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
     }
   }
 
+  // Lógica de Projeção (Sem IA)
+  const now = new Date();
+  const isCurrentMonth = month === now.toISOString().slice(0, 7);
+  const daysInMonth = new Date(parseInt(year), parseInt(m), 0).getDate();
+  const currentDay = isCurrentMonth ? now.getDate() : daysInMonth;
+  const remainingDays = daysInMonth - currentDay;
+
+  const avgDailySpend = totalExpenses / currentDay;
+  const projectedExpenses = totalExpenses + (avgDailySpend * remainingDays);
+  const projectedBalance = totalFamilyIncome - projectedExpenses;
+
   // Algoritmo de liquidação mínima (greedy)
   const settlements: { from: string; from_name: string; to: string; to_name: string; amount: number }[] = [];
   const debtors  = members.filter(m => balance[m.id] < -0.01).map(m => ({ ...m, bal: balance[m.id] }));
@@ -113,6 +134,12 @@ export async function getSettlement(groupId: string, tenantId: string, month: st
     total_expenses: totalExpenses, 
     total_income: totalFamilyIncome,
     balance_remaining: totalFamilyIncome - totalExpenses,
+    projections: {
+      avg_daily_spend: Math.round(avgDailySpend * 100) / 100,
+      projected_expenses: Math.round(projectedExpenses * 100) / 100,
+      projected_balance: Math.round(projectedBalance * 100) / 100,
+      is_warning: projectedBalance < 0
+    },
     period: month 
   };
 }

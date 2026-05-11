@@ -679,11 +679,36 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
 
         {/* WALLET */}
         {tab === 'wallet' && (
-          <>
-            <button onClick={() => setModal('expense')}
-              className="w-full py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
-              <Plus size={15} /> Registrar Despesa
-            </button>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const d = new Date(selectedMonth + '-01');
+                    d.setMonth(d.getMonth() - 1);
+                    setSelectedMonth(d.toISOString().slice(0, 7));
+                  }}
+                  className="p-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-violet-600 transition-colors">
+                  <ChevronRight size={16} className="rotate-180" />
+                </button>
+                <div className="bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-100 font-bold text-slate-700 text-sm capitalize">
+                  {new Date(selectedMonth + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                </div>
+                <button
+                  onClick={() => {
+                    const d = new Date(selectedMonth + '-01');
+                    d.setMonth(d.getMonth() + 1);
+                    setSelectedMonth(d.toISOString().slice(0, 7));
+                  }}
+                  className="p-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-violet-600 transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <button onClick={() => setModal('expense')}
+                className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
+                <Plus size={14} /> Registrar Despesa
+              </button>
+            </div>
 
             {/* Acerto do mês */}
             {settlement && settlement.settlements.length > 0 && (
@@ -726,7 +751,7 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                 );
               })}
             </div>
-          </>
+          </div>
         )}
 
         {/* TASKS */}

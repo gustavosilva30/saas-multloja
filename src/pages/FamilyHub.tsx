@@ -254,6 +254,7 @@ function NewExpenseModal({ groupId, members, onClose, onSaved }: {
     paid_by_member_id: members[0]?.id || '',
     amount: '', description: '', category: 'GENERAL', split_type: 'EQUAL',
     expense_date: new Date().toISOString().slice(0, 10),
+    is_recurrent: false, recurrence_period: 'MONTHLY',
   });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
@@ -322,6 +323,25 @@ function NewExpenseModal({ groupId, members, onClose, onSaved }: {
               </button>
             ))}
           </div>
+        </div>
+        <div className="bg-slate-50 rounded-2xl px-4 py-3 space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => set('is_recurrent', !form.is_recurrent)}
+              className={`w-10 h-5 rounded-full relative transition-colors ${form.is_recurrent ? 'bg-violet-500' : 'bg-slate-300'}`}>
+              <div className={`w-4 h-4 bg-white rounded-full shadow absolute top-0.5 transition-all ${form.is_recurrent ? 'left-5' : 'left-0.5'}`} />
+            </div>
+            <span className="text-sm font-medium text-slate-700">Despesa recorrente</span>
+          </label>
+          {form.is_recurrent && (
+            <div><Label c="Frequência" />
+              <select value={form.recurrence_period} onChange={e => set('recurrence_period', e.target.value)} className={inp + ' cursor-pointer'}>
+                <option value="WEEKLY">Semanal</option>
+                <option value="BIWEEKLY">Quinzenal</option>
+                <option value="MONTHLY">Mensal</option>
+                <option value="YEARLY">Anual</option>
+              </select>
+            </div>
+          )}
         </div>
         <button type="submit" disabled={saving}
           className="w-full py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm disabled:opacity-50">

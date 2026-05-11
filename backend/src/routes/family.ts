@@ -223,14 +223,17 @@ router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
     await assertAllGroupMembers(validatedSplits.map(s => s.member_id), gid(req), tid(req));
   }
 
+  const is_recurrent      = !!req.body.is_recurrent;
+  const recurrence_period = req.body.recurrence_period || null;
+
   let expense: any;
   await withTransaction(async (client: PoolClient) => {
     const r = await client.query(
       `INSERT INTO family_expenses
-         (group_id, tenant_id, paid_by_member_id, amount, description, category, split_type, expense_date, receipt_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+         (group_id, tenant_id, paid_by_member_id, amount, description, category, split_type, expense_date, receipt_url, is_recurrent, recurrence_period)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [gid(req), tid(req), paid_by_member_id, amount, description, category, split_type,
-       expense_date, receipt_url]
+       expense_date, receipt_url, is_recurrent, recurrence_period]
     );
     expense = r.rows[0];
 

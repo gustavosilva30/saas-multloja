@@ -523,9 +523,9 @@ function NewGoalModal({ groupId, onClose, onSaved }: { groupId: string; onClose:
 function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: string }) {
   const [tab, setTab] = useState<'home' | 'wallet' | 'tasks' | 'calendar'>('home');
   const [modal, setModal] = useState<'member' | 'expense' | 'task' | 'event' | 'goal' | null>(null);
-
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const { data: dash, reload } = useApi<any>(`/api/family/groups/${groupId}/dashboard`, [groupId]);
-  const { data: expData, reload: reloadExp } = useApi<any>(`/api/family/groups/${groupId}/expenses?month=${new Date().toISOString().slice(0, 7)}`, [tab === 'wallet', groupId]);
+  const { data: expData, reload: reloadExp } = useApi<any>(`/api/family/groups/${groupId}/expenses?month=${selectedMonth}`, [tab === 'wallet', groupId, selectedMonth]);
   const { data: tasksData, reload: reloadTasks } = useApi<any>(`/api/family/groups/${groupId}/tasks`, [tab === 'tasks', groupId]);
   const { data: eventsData, reload: reloadEvents } = useApi<any>(`/api/family/groups/${groupId}/events`, [tab === 'calendar', groupId]);
 

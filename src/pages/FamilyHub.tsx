@@ -265,6 +265,7 @@ function NewExpenseModal({ groupId, members, categories, onClose, onSaved, onMan
   const [form, setForm] = useState({
     paid_by_member_id: members[0]?.id || '',
     amount: '', description: '', category: 'GENERAL', split_type: 'EQUAL',
+    payment_method: 'DINHEIRO',
     expense_date: new Date().toISOString().slice(0, 10),
     is_recurrent: false, recurrence_period: 'MONTHLY',
   });
@@ -318,6 +319,17 @@ function NewExpenseModal({ groupId, members, categories, onClose, onSaved, onMan
             <select value={form.split_type} onChange={e => set('split_type', e.target.value)} className={inp + ' cursor-pointer'}>
               <option value="EQUAL">Igual</option>
               <option value="PROPORTIONAL">Proporcional à renda</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          <div><Label c="Forma de Pagamento" />
+            <select value={form.payment_method} onChange={e => set('payment_method', e.target.value)} className={inp + ' cursor-pointer'}>
+              <option value="DINHEIRO">💵 Dinheiro</option>
+              <option value="CARTAO_CREDITO">💳 Cartão de Crédito</option>
+              <option value="CARTAO_DEBITO">💳 Cartão de Débito</option>
+              <option value="PIX">⚡ PIX</option>
+              <option value="OUTRO">🔘 Outro</option>
             </select>
           </div>
         </div>
@@ -839,9 +851,12 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
           <div className="flex gap-3 mt-4 overflow-x-auto pb-1">
             {members.map((m: any) => (
               <div key={m.id} onClick={() => setModal({ type: 'edit_member', data: m } as any)}
-                className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer hover:scale-105 transition-transform">
+                className="flex flex-col items-center gap-1 flex-shrink-0 cursor-pointer hover:scale-105 transition-transform bg-white/50 p-2 rounded-2xl border border-transparent hover:border-violet-100 hover:bg-white shadow-sm">
                 <Avatar emoji={m.avatar_emoji} color={m.avatar_color} size="md" points={m.points} />
-                <span className="text-[10px] text-slate-600 font-medium">{m.name.split(' ')[0]}</span>
+                <div className="text-center">
+                  <p className="text-[10px] text-slate-900 font-bold leading-tight truncate w-16">{m.name.split(' ')[0]}</p>
+                  <p className="text-[9px] text-emerald-600 font-black">{fmt(Number(m.monthly_income || 0))}</p>
+                </div>
                 <RoleBadge role={m.role} />
               </div>
             ))}
@@ -1137,6 +1152,14 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                               <span className="text-[10px]">{item.avatar_emoji}</span>
                               <span className="text-[10px] text-slate-600 font-bold">{item.paid_by_name || item.member_name || 'Família'}</span>
                             </div>
+                            {!isInc && item.payment_method && (
+                              <>
+                                <span className="text-[10px] text-slate-300">•</span>
+                                <span className="text-[10px] text-slate-500 font-bold flex items-center gap-0.5">
+                                  {item.payment_method === 'PIX' ? '⚡' : item.payment_method.includes('CARTAO') ? '💳' : '💵'} {item.payment_method.replace('_', ' ')}
+                                </span>
+                              </>
+                            )}
                             <span className="text-[10px] text-slate-300">•</span>
                             <span className="text-[10px] text-slate-400 font-medium">
                               {new Date((item.expense_date || item.income_date) + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}

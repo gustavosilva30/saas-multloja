@@ -75,7 +75,7 @@ router.delete('/groups/:groupId', wrap(async (req, res) => {
 router.get('/groups/:groupId/members', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
   const r = await query(
-    `SELECT id, name, role, avatar_color, avatar_emoji, points, income_share, phone, is_active
+    `SELECT id, name, role, avatar_color, avatar_emoji, points, income_share, monthly_income, phone, is_active
      FROM family_members WHERE group_id = $1 AND tenant_id = $2 AND is_active = true ORDER BY role, name`,
     [gid(req), tid(req)]
   );
@@ -203,6 +203,7 @@ router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
 
   const category   = String(req.body.category || 'GENERAL').trim().slice(0, 50);
   const split_type = parseEnum(req.body.split_type ?? 'EQUAL',   ALLOWED_SPLIT, 'split_type');
+  const payment_method = String(req.body.payment_method || 'DINHEIRO').trim().slice(0, 50);
   const expense_date = req.body.expense_date || new Date().toISOString().slice(0, 10);
   const receipt_url  = req.body.receipt_url ?? null;
   const custom_splits = Array.isArray(req.body.custom_splits) ? req.body.custom_splits : [];
@@ -235,9 +236,9 @@ router.post('/groups/:groupId/expenses', wrap(async (req, res) => {
   await withTransaction(async (client: PoolClient) => {
     const r = await client.query(
       `INSERT INTO family_expenses
-         (group_id, tenant_id, paid_by_member_id, amount, description, category, split_type, expense_date, receipt_url, is_recurrent, recurrence_period)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [gid(req), tid(req), paid_by_member_id, amount, description, category, split_type,
+         (group_id, tenant_id, paid_by_member_id, amount, description, category, split_type, payment_method, expense_date, receipt_url, is_recurrent, recurrence_period)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [gid(req), tid(req), paid_by_member_id, amount, description, category, split_type, payment_method,
        expense_date, receipt_url, is_recurrent, recurrence_period]
     );
     expense = r.rows[0];

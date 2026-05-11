@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { apiFetch } from '@/lib/api';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ChartTooltip } from 'recharts';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -75,7 +76,10 @@ function Progress({ value, max, color = '#10b981' }: { value: number; max: numbe
       </div>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: color }} />
+          style={{ 
+            width: `${pct}%`, 
+            background: pct > 90 ? '#ef4444' : pct > 70 ? '#f59e0b' : color 
+          }} />
       </div>
       <div className="text-right text-xs text-slate-400">Meta: {fmt(max)}</div>
     </div>
@@ -990,7 +994,7 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setModal('expense')}
-                  className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
+                  className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors">
                   <Plus size={14} /> Despesa
                 </button>
                 <button onClick={() => setModal('income')}
@@ -1006,28 +1010,48 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-colors" />
               <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-violet-500/5 rounded-full blur-3xl group-hover:bg-violet-500/10 transition-colors" />
 
-              <div className="flex items-center justify-between mb-6 relative">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponível</p>
-                    <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase">Realtime</span>
+              <div className="flex items-center justify-between mb-8 relative">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Conjunto</p>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase ${(settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {(settlement?.balance_remaining || 0) >= 0 ? 'Positivo' : 'Déficit'}
+                    </span>
                   </div>
-                  <h3 className="text-3xl font-black text-slate-900 flex items-baseline gap-1">
+                  <h3 className="text-4xl font-black text-slate-900 flex items-baseline gap-1">
                     <span className="text-sm font-medium text-slate-400">R$</span>
                     {Number(settlement?.balance_remaining || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </h3>
                 </div>
-                <div className={`p-4 rounded-2xl shadow-sm transition-transform group-hover:scale-110 ${ (settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-rose-500 text-white shadow-rose-200' }`}>
-                  <TrendingUp size={24} className={(settlement?.balance_remaining || 0) < 0 ? 'rotate-180' : ''} />
+                <div className={`p-5 rounded-3xl shadow-lg transition-transform group-hover:scale-110 ${ (settlement?.balance_remaining || 0) >= 0 ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-rose-500 text-white shadow-rose-200' }`}>
+                  <Wallet size={28} />
                 </div>
               </div>
               
-              <div className="space-y-5 relative">
+              <div className="space-y-6 relative">
+                {/* Grouped Indicators: Income - Expenses = Balance Story */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100/50">
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-tight mb-1">Entradas</p>
+                    <p className="text-lg font-black text-emerald-700">{fmt(settlement?.total_income || 0)}</p>
+                  </div>
+                  <div className="text-slate-300 font-black">-</div>
+                  <div className="flex-1 bg-rose-50/50 rounded-2xl p-4 border border-rose-100/50">
+                    <p className="text-[9px] font-bold text-rose-600 uppercase tracking-tight mb-1">Saídas</p>
+                    <p className="text-lg font-black text-rose-700">{fmt(settlement?.total_expenses || 0)}</p>
+                  </div>
+                  <div className="text-slate-300 font-black">=</div>
+                  <div className="flex-1 bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mb-1">Saldo</p>
+                    <p className={`text-lg font-black ${(settlement?.balance_remaining || 0) >= 0 ? 'text-slate-800' : 'text-rose-600'}`}>{fmt(settlement?.balance_remaining || 0)}</p>
+                  </div>
+                </div>
+
                 <div>
                   <div className="flex justify-between text-[11px] mb-2">
                     <span className="text-slate-500 font-bold flex items-center gap-1.5">
                       <LayoutGrid size={12} className="text-violet-400" /> 
-                      Uso do Orçamento
+                      Uso do Orçamento Familiar
                     </span>
                     <span className={`font-black ${((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) > 0.9 ? 'text-rose-600' : 'text-slate-700'}`}>
                       {Math.round(((settlement?.total_expenses || 0) / (settlement?.total_income || 1)) * 100)}%
@@ -1046,31 +1070,12 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 hover:bg-white hover:shadow-md transition-all cursor-default">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">Total Recebido</p>
-                    <p className="text-lg font-black text-emerald-600">{fmt(settlement?.total_income || 0)}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <ArrowUpCircle size={10} className="text-emerald-400" />
-                      <span className="text-[9px] text-slate-400 font-medium">Este mês</span>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 hover:bg-white hover:shadow-md transition-all cursor-default">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">Total Gasto</p>
-                    <p className="text-lg font-black text-slate-800">{fmt(settlement?.total_expenses || 0)}</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <ShoppingCart size={10} className="text-rose-400" />
-                      <span className="text-[9px] text-slate-400 font-medium">Acumulado</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Mathematical Projections & Insights */}
                 <div className="pt-5 border-t border-slate-100">
                   <div className="grid grid-cols-2 gap-6 mb-5">
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        <TrendingUp size={10} /> Queima Diária
+                        <TrendingUp size={10} /> Média de Gasto Diário
                       </p>
                       <p className="text-sm font-black text-slate-700">{fmt(settlement?.projections?.avg_daily_spend || 0)} <span className="text-[10px] text-slate-400 font-normal">/dia</span></p>
                     </div>
@@ -1100,9 +1105,98 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                       </p>
                     </div>
                   </div>
+
+                  {/* ── Últimos Lançamentos (Mini Lista) ── */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Lançamentos Recentes</p>
+                    <div className="space-y-2">
+                      {[...(expData?.expenses || []), ...(incData?.incomes || [])]
+                        .sort((a, b) => new Date((b.expense_date || b.income_date) + 'T12:00:00').getTime() - new Date((a.expense_date || a.income_date) + 'T12:00:00').getTime())
+                        .slice(0, 5)
+                        .map((item: any) => {
+                          const isInc = !!item.income_date;
+                          return (
+                            <div key={item.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50/50 border border-slate-100/50">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{isInc ? '💎' : getCatMeta(item.category).icon({ size: 12 })}</span>
+                                <div>
+                                  <p className="font-bold text-slate-700 truncate w-32">{item.description}</p>
+                                  <p className="text-[9px] text-slate-400">{item.avatar_emoji} {item.paid_by_name || item.member_name || 'Família'}</p>
+                                </div>
+                              </div>
+                              <span className={`font-black ${isInc ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                {isInc ? '+' : '-'}{fmt(Number(item.amount))}
+                              </span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* ── Distribuição por Categoria (Gráfico Donut) ── */}
+            {expenses.length > 0 && (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Despesas por Categoria</p>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-40 h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(
+                            expenses.reduce((acc: any, exp: any) => {
+                              acc[exp.category] = (acc[exp.category] || 0) + Number(exp.amount);
+                              return acc;
+                            }, {})
+                          ).map(([name, value]) => ({ name, value }))}
+                          innerRadius={50}
+                          outerRadius={70}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {Object.entries(
+                            expenses.reduce((acc: any, exp: any) => {
+                              acc[exp.category] = (acc[exp.category] || 0) + Number(exp.amount);
+                              return acc;
+                            }, {})
+                          ).map(([name], index) => (
+                            <Cell key={`cell-${index}`} fill={getCatMeta(name).color} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip 
+                          formatter={(v: number) => fmt(v)}
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-2 w-full">
+                    {Object.entries(
+                      expenses.reduce((acc: any, exp: any) => {
+                        acc[exp.category] = (acc[exp.category] || 0) + Number(exp.amount);
+                        return acc;
+                      }, {})
+                    ).sort((a: any, b: any) => b[1] - a[1]).map(([name, val]: any) => {
+                      const meta = getCatMeta(name);
+                      const Icon = meta.icon;
+                      return (
+                        <div key={name} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: meta.color + '22', color: meta.color }}>
+                            <Icon size={12} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-bold text-slate-500 truncate uppercase">{name === 'HOUSING' ? 'Casa' : name === 'TRANSPORT' ? 'Trans.' : name === 'EDUCATION' ? 'Educ.' : name === 'LEISURE' ? 'Lazer' : name === 'HEALTH' ? 'Saúde' : name === 'FOOD' ? 'Comida' : name}</p>
+                            <p className="text-[11px] font-black text-slate-800">{fmt(val)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Acerto do mês */}
             {settlement && settlement.settlements.length > 0 && (

@@ -47,7 +47,7 @@ export const authenticateToken = async (
 
     // Check if user still exists and is active
     const userResult = await query(
-      'SELECT id, email, role, tenant_id, is_active FROM user_profiles WHERE id = $1',
+      'SELECT * FROM find_user_by_id($1)',
       [decoded.userId]
     );
 

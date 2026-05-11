@@ -1115,10 +1115,13 @@ function FamilyDashboard({ groupId, groupName }: { groupId: string; groupName: s
                         .slice(0, 5)
                         .map((item: any) => {
                           const isInc = !!item.income_date;
+                          const Icon = !isInc ? getCatMeta(item.category).icon : null;
                           return (
                             <div key={item.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50/50 border border-slate-100/50">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm">{isInc ? '💎' : getCatMeta(item.category).icon({ size: 12 })}</span>
+                                <span className="text-sm">
+                                  {isInc ? '💎' : Icon ? <Icon size={12} /> : '📦'}
+                                </span>
                                 <div>
                                   <p className="font-bold text-slate-700 truncate w-32">{item.description}</p>
                                   <p className="text-[9px] text-slate-400">{item.avatar_emoji} {item.paid_by_name || item.member_name || 'Família'}</p>

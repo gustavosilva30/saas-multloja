@@ -266,10 +266,10 @@ router.delete('/groups/:groupId/expenses/:expenseId', wrap(async (req, res) => {
 router.get('/groups/:groupId/incomes', wrap(async (req, res) => {
   await validateGroup(gid(req), tid(req));
   const { month } = req.query as Record<string, string>;
-  const conditions = [`group_id = $1`, `tenant_id = $2`];
+  const conditions = [`i.group_id = $1`, `i.tenant_id = $2`];
   const params: any[] = [gid(req), tid(req)];
   if (month) {
-    conditions.push(`TO_CHAR(income_date, 'YYYY-MM') = $3`);
+    conditions.push(`TO_CHAR(i.income_date, 'YYYY-MM') = $3`);
     params.push(month);
   }
   const r = await query(

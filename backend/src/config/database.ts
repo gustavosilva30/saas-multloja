@@ -259,11 +259,11 @@ export async function withTransaction<T>(
 ): Promise<T> {
   const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const context = tenantContext.getStore();
     if (context?.tenantId) {
       await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [context.tenantId]);
     }
-    await client.query('BEGIN');
     const result = await callback(client);
     await client.query('COMMIT');
     return result;

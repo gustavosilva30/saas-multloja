@@ -277,6 +277,7 @@ export async function withTransaction<T>(
 
 export async function query(text: string, params?: any[]) {
   const context = tenantContext.getStore();
+  console.log('[DB Query] Context:', context?.tenantId, 'Query:', text.trim().substring(0, 50));
   if (context?.tenantId) {
     const client = await pool.connect();
     try {

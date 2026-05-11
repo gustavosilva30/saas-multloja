@@ -156,6 +156,7 @@ router.post(
       if (!valid)         { res.status(401).json({ error: 'Invalid credentials' }); return; }
 
       // Ativa o contexto do tenant para as próximas operações (update last_login e logs)
+      console.log('[AuthMiddleware] User found:', user.id, 'Tenant:', user.tenant_id);
       await tenantContext.run({ tenantId: user.tenant_id }, async () => {
         await query('UPDATE user_profiles SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
@@ -242,6 +243,7 @@ router.post('/logout', authenticateToken, async (req: Request, res: Response): P
 
 // ── GET /api/auth/me ─────────────────────────────────────────────────────────
 router.get('/me', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  console.log('[AuthRoute] GET /me - User:', req.user?.id, 'Tenant:', req.user?.tenant_id);
   try {
     const r = await query(
       `SELECT u.id, u.email, u.full_name, u.role, u.tenant_id, u.created_at,

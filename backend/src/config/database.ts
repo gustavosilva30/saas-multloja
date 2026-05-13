@@ -84,6 +84,10 @@ export async function runMigrations(): Promise<void> {
     `);
 
     await client.query(`
+      ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS job_title TEXT
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS tenant_modules (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -199,6 +203,12 @@ export async function runMigrations(): Promise<void> {
     await client.query(`
       ALTER TABLE products
         ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'
+    `);
+    
+    // Ensure products.barcode column exists
+    await client.query(`
+      ALTER TABLE products
+        ADD COLUMN IF NOT EXISTS barcode TEXT
     `);
 
     // Seed: default niche templates

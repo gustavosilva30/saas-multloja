@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   full_name TEXT,
   avatar_url TEXT,
   role TEXT CHECK (role IN ('owner', 'admin', 'operator', 'viewer')) NOT NULL DEFAULT 'operator',
+  job_title TEXT,
   is_active BOOLEAN DEFAULT true,
   last_login_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

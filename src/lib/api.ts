@@ -147,6 +147,7 @@ export interface AuthUser {
   email: string;
   full_name: string;
   role: 'owner' | 'admin' | 'operator' | 'viewer';
+  job_title?: string;
   tenant_id: string;
 }
 
@@ -190,6 +191,23 @@ export const authApi = {
     request('/api/auth/logout', {
       method: 'POST',
     }),
+};
+
+// ─── Usuários ─────────────────────────────────────────────────
+
+export const usersApi = {
+  list: () => apiFetch<{ users: any[] }>('/api/users'),
+  create: (data: any) => apiFetch<{ user: any }>('/api/users', {
+    method: 'POST',
+    body: data,
+  }),
+  update: (id: string, data: any) => apiFetch<{ user: any }>(`/api/users/${id}`, {
+    method: 'PUT',
+    body: data,
+  }),
+  delete: (id: string) => apiFetch<{ ok: boolean }>(`/api/users/${id}`, {
+    method: 'DELETE',
+  }),
 };
 
 // ─── Produtos ─────────────────────────────────────────────────

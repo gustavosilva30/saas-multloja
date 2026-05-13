@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, type DragEvent } from 'react';
-import { Upload, FileText, Image as ImageIcon, File, Download, Loader2, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Image as ImageIcon, File, Download, Loader2, X, CheckCircle2, AlertTriangle, FileSpreadsheet, Presentation } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 type ConversionFormat = 'pdf' | 'jpg' | 'png' | 'webp' | 'docx';
@@ -21,9 +21,17 @@ export function FileConverter() {
 
   const getAvailableFormats = useCallback((fileType: string): ConversionFormat[] => {
     if (fileType.startsWith('image/')) {
-      return ['jpg', 'png', 'webp', 'pdf'];
+      return ['jpg', 'png', 'webp'];
     }
-    if (fileType.includes('word') || fileType.includes('document') || fileType.includes('officedocument.wordprocessingml')) {
+    if (
+      fileType.includes('word') || 
+      fileType.includes('document') || 
+      fileType.includes('officedocument') ||
+      fileType.includes('excel') ||
+      fileType.includes('spreadsheet') ||
+      fileType.includes('powerpoint') ||
+      fileType.includes('presentation')
+    ) {
       return ['pdf'];
     }
     if (fileType === 'application/pdf') {
@@ -61,11 +69,11 @@ export function FileConverter() {
 
   const validateAndSetFile = (selectedFile: File) => {
     // Validate file type
-    const validTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const validTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint'];
     const isValid = validTypes.some(type => selectedFile.type.startsWith(type));
 
     if (!isValid) {
-      setError('Tipo de arquivo não suportado. Use imagens (JPG, PNG, WEBP), PDF ou Word (DOCX).');
+      setError('Tipo de arquivo não suportado. Use imagens, PDF, Word, Excel ou PowerPoint.');
       return;
     }
 
@@ -111,12 +119,20 @@ export function FileConverter() {
         throw new Error(errorData.error || 'Erro ao converter arquivo');
       }
 
+      // Try to get actual filename from content-disposition header
+      const disposition = res.headers.get('content-disposition');
+      let convertedFilename = `${file.name.split('.')[0]}.${outputFormat}`;
+      if (disposition && disposition.includes('filename="')) {
+        convertedFilename = disposition.split('filename="')[1].split('"')[0];
+      } else if (disposition && disposition.includes('filename=')) {
+        convertedFilename = disposition.split('filename=')[1];
+      }
+
       // Get the blob from response
       const blob = await res.blob();
       
       // Create download URL from blob
       const downloadUrl = URL.createObjectURL(blob);
-      const convertedFilename = `${file.name.split('.')[0]}.${outputFormat}`;
 
       setResult({
         download_url: downloadUrl,
@@ -148,7 +164,9 @@ export function FileConverter() {
   const getFileIcon = () => {
     if (!file) return File;
     if (file.type.startsWith('image/')) return ImageIcon;
-    if (file.type.includes('pdf')) return FileText;
+    if (file.type.includes('pdf') || file.type.includes('word')) return FileText;
+    if (file.type.includes('excel') || file.type.includes('spreadsheet')) return FileSpreadsheet;
+    if (file.type.includes('powerpoint') || file.type.includes('presentation')) return Presentation;
     return File;
   };
 
@@ -165,7 +183,7 @@ export function FileConverter() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Conversor de Arquivos</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Converta imagens, PDF e documentos Word sem sair do sistema.
+          Converta imagens, PDF, documentos Word, Excel e PowerPoint sem sair do sistema.
         </p>
       </div>
 
@@ -186,7 +204,7 @@ export function FileConverter() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.pdf,.doc,.docx"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -209,7 +227,7 @@ export function FileConverter() {
                 </button>
               </div>
               <p className="text-xs text-zinc-400">
-                Formatos suportados: JPG, PNG, WEBP, PDF, DOCX (máx 50MB)
+                Formatos suportados: JPG, PNG, WEBP, PDF, Word, Excel, PowerPoint (máx 50MB)
               </p>
             </div>
           </div>

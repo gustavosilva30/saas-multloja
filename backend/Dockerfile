@@ -16,12 +16,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install LibreOffice for document conversion (Word to PDF)
+# Install LibreOffice and Poppler for document/PDF conversion
 RUN apk add --no-cache \
     libreoffice \
     libreoffice-writer \
     libreoffice-calc \
     libreoffice-impress \
+    poppler-utils \
     && rm -rf /var/cache/apk/*
 
 # Install production dependencies only

@@ -47,7 +47,7 @@ INSERT INTO module_catalog (module_id, name, description, category, price, is_fr
   ('marketing',    'Marketing SMS/Email',  'Automações de recuperação de clientes e promoções', 'Marketing',  49.90, false, 12),
   ('delivery',     'App de Entregadores',  'Roteirização e aplicativo exclusivo para motoboys', 'Logística',  59.90, false, 13),
   ('image_editor', 'Editor de Imagens',    'Criação de artes e banners para redes sociais', 'Marketing',     19.90, false, 14),
-  ('file_converter','Conversor de Arquivos','Conversão rápida de PDF, Word e Imagens sem sair do sistema', 'Ferramentas', 19.90, false, 15),
+  ('file_converter','Conversor de Arquivos','Conversão rápida de PDF, Word, Excel, PowerPoint e Imagens sem sair do sistema', 'Ferramentas', 19.90, false, 15),
   ('messages',     'Recados Internos',     'Comunicação entre membros da equipe', 'Operação',                 0.00,  true,  16),
   ('calendar',     'Calendário',           'Agendamentos e compromissos da equipe', 'Operação',               0.00,  true,  17),
   ('freight_quote','Simulador de Frete',   'Cotação de frete com múltiplas transportadoras', 'Logística',    19.90, false, 18),

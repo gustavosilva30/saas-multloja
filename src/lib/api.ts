@@ -210,6 +210,16 @@ export const usersApi = {
   }),
 };
 
+// ─── Tenants ──────────────────────────────────────────────────
+
+export const tenantsApi = {
+  me: () => apiFetch<{ tenant: any }>('/api/tenants/me'),
+  update: (data: any) => apiFetch<{ tenant: any }>('/api/tenants/me', {
+    method: 'PUT',
+    body: data,
+  }),
+};
+
 // ─── Produtos ─────────────────────────────────────────────────
 
 export const productsApi = {

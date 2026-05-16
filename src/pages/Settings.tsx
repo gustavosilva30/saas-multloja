@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
-import { Plus, MapPin, Edit2, Trash2, CheckCircle2, XCircle } from "lucide-react";
-import { usersApi } from "../lib/api";
+import { useState, useEffect, useRef } from "react";
+import { Plus, MapPin, Edit2, Trash2, CheckCircle2, XCircle, Upload as UploadIcon, Loader2 } from "lucide-react";
+import { usersApi, tenantsApi, uploadApi } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 
 export function Settings() {
   const { user, role } = useAuth();
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,11 +25,15 @@ export function Settings() {
 
   const canManage = role === 'owner' || role === 'admin';
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const res = await usersApi.list();
-      setUsersList(res.users);
+      const [usersRes, tenantRes] = await Promise.all([
+        usersApi.list(),
+        tenantsApi.me()
+      ]);
+      setUsersList(usersRes.users);
+      setTenant(tenantRes.tenant);
     } catch (err) {
       console.error(err);
     } finally {
@@ -35,8 +42,39 @@ export function Settings() {
   };
 
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas imagens.');
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      
+      // Upload via existing route
+      const { url } = await uploadApi.upload(file);
+      
+      // Update tenant settings with new logo
+      const currentSettings = tenant?.settings || {};
+      await tenantsApi.update({
+        settings: { ...currentSettings, logoUrl: url }
+      });
+      
+      // Refresh
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Falha ao fazer upload da logo');
+    } finally {
+      setUploadingLogo(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleOpenModal = (userToEdit: any = null) => {
     if (userToEdit) {
@@ -71,7 +109,7 @@ export function Settings() {
         await usersApi.create(formData);
       }
       setIsModalOpen(false);
-      loadUsers();
+      loadData();
     } catch (err: any) {
       alert(err.message || 'Erro ao salvar usuário');
     }
@@ -80,7 +118,7 @@ export function Settings() {
   const handleToggleActive = async (userId: string, currentStatus: boolean) => {
     try {
       await usersApi.update(userId, { is_active: !currentStatus });
-      loadUsers();
+      loadData();
     } catch (err) {
       alert('Erro ao alterar status');
     }
@@ -115,20 +153,47 @@ export function Settings() {
           </div>
         </div>
 
-        {/* Logo (Mantido como Visual) */}
+        {/* Logo */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
            <h3 className="font-semibold text-lg dark:text-white mb-6 w-full text-left">Upload de logo</h3>
            
-           <div className="w-32 h-32 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center justify-center mb-6 text-zinc-400 hover:border-emerald-500 hover:text-emerald-500 cursor-pointer">
-              <div className="w-12 h-12 bg-emerald-500 text-white rounded flex items-center justify-center font-bold text-2xl mb-2">
-                S
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-900 dark:text-white">SOLUÇÕES</span>
+           <input 
+             type="file" 
+             ref={fileInputRef} 
+             onChange={handleLogoUpload} 
+             accept="image/*" 
+             className="hidden" 
+           />
+
+           <div 
+             onClick={() => canManage && fileInputRef.current?.click()}
+             className={`w-32 h-32 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border-2 border-dashed flex flex-col items-center justify-center mb-6 overflow-hidden
+               ${canManage ? 'border-zinc-300 dark:border-zinc-700 hover:border-emerald-500 hover:text-emerald-500 cursor-pointer' : 'border-zinc-200 opacity-70'}
+               ${tenant?.settings?.logoUrl ? 'p-1' : 'text-zinc-400'}`}
+           >
+              {tenant?.settings?.logoUrl ? (
+                <img src={tenant.settings.logoUrl} alt="Logo da Empresa" className="w-full h-full object-contain rounded-xl" />
+              ) : (
+                <>
+                  <div className="w-12 h-12 bg-emerald-500 text-white rounded flex items-center justify-center font-bold text-2xl mb-2">
+                    {tenant?.name?.charAt(0)?.toUpperCase() || 'E'}
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-900 dark:text-white">SUA LOGO</span>
+                </>
+              )}
            </div>
 
-           <button className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium">
-              Carregar Logo
-           </button>
+           {canManage && (
+             <button 
+               onClick={() => fileInputRef.current?.click()}
+               disabled={uploadingLogo}
+               className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+             >
+                {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <UploadIcon size={16} />}
+                {uploadingLogo ? 'Enviando...' : 'Carregar Logo'}
+             </button>
+           )}
+           <p className="text-xs text-zinc-400 mt-4">Esta logo aparecerá nos seus recibos e pedidos.</p>
         </div>
 
         {/* Usuários Ativos - AGORA FUNCIONAL */}

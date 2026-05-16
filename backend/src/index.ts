@@ -36,6 +36,7 @@ import familyRoutes from './routes/family';
 import ecommerceRoutes from './routes/ecommerce';
 import convertRoutes from './routes/convert';
 import userRoutes from './routes/users';
+import tenantRoutes from './routes/tenants';
 
 const app = express();
 
@@ -132,6 +133,7 @@ app.use('/api/family', familyRoutes);
 app.use('/api/ecommerce', ecommerceRoutes);
 app.use('/api/convert', convertRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/tenants', tenantRoutes);
 app.use('/ml', ecommerceRoutes); // Suporte para /ml/callback
 app.use('/api/mercadolivre/auth', ecommerceRoutes); // Suporte para /api/mercadolivre/auth/callback
 

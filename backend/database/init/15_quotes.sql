@@ -1,6 +1,15 @@
 -- ============================================================================
--- QUOTES / BUDGETS (Orçamentos)
+-- 15. QUOTES & QUOTE ITEMS
 -- ============================================================================
+
+-- Garante que a função de trigger exista
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS quotes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

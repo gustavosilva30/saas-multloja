@@ -2,6 +2,14 @@
 -- ADD GUEST SUPPORT TO SERVICE ORDERS
 -- ============================================================================
 
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 ALTER TABLE service_orders 
 ADD COLUMN IF NOT EXISTS guest_name VARCHAR(255),
 ADD COLUMN IF NOT EXISTS guest_phone VARCHAR(50),

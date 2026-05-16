@@ -67,7 +67,7 @@ router.get(
         const like = `%${req.query.search}%`;
         params.push(like);
         conditions.push(
-          `(so.os_number::text ILIKE $${params.length} OR c.name ILIKE $${params.length})`
+          `(so.os_number::text ILIKE $${params.length} OR c.name ILIKE $${params.length} OR so.guest_name ILIKE $${params.length})`
         );
       }
 
@@ -78,6 +78,7 @@ router.get(
         query(
           `SELECT so.id, so.os_number, so.status, so.total, so.expected_at,
                   so.created_at, so.updated_at, so.asset_metadata,
+                  so.guest_name, so.guest_phone, so.guest_document, so.guest_address,
                   c.name AS customer_name,
                   u.full_name AS assignee_name
            FROM service_orders so

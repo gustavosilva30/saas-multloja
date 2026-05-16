@@ -196,6 +196,7 @@ function NewOsModal({ onClose, onCreated }: {
   const [guestPhone, setGuestPhone] = useState('');
   const [guestDocument, setGuestDocument] = useState('');
   const [guestAddress, setGuestAddress] = useState('');
+  const [assetFields, setAssetFields] = useState<{ key: string; value: string }[]>([{ key: '', value: '' }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -799,7 +800,7 @@ export function Services() {
                           OS-{String(os.os_number).padStart(4, '0')}
                         </span>
                         <span className="text-xs text-zinc-500 flex items-center gap-1 mt-0.5">
-                          <User size={10} /> {os.customer_name || 'Sem cliente'}
+                          <User size={10} /> {os.customer_name || os.guest_name || 'Sem cliente'}
                         </span>
                       </td>
                       <td className="px-6 py-4">

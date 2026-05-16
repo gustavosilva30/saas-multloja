@@ -15,7 +15,6 @@ import { VoiceAssistantProvider } from "../contexts/VoiceAssistantContext";
 import { GlobalMicButton } from "../components/GlobalMicButton";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { OSWrapper } from "../components/OSWrapper";
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -206,7 +205,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   const content = (
-    <div className="flex h-full bg-white overflow-hidden text-zinc-900 font-sans">
+    <div className="flex h-screen bg-white overflow-hidden text-zinc-900 font-sans">
       <div className="hidden lg:flex shrink-0">{sidebar}</div>
 
       {mobileSidebarOpen && (
@@ -217,7 +216,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <main className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa]">
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </main>
@@ -226,14 +225,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 
-  return (
-    <OSWrapper>
-      {isVoiceAssistantActive ? (
-        <VoiceAssistantProvider>{content}</VoiceAssistantProvider>
-      ) : (
-        content
-      )}
-    </OSWrapper>
+  return isVoiceAssistantActive ? (
+    <VoiceAssistantProvider>{content}</VoiceAssistantProvider>
+  ) : (
+    content
   );
 }
 

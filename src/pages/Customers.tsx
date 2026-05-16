@@ -164,6 +164,7 @@ function CustomerDrawer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
   const [sales, setSales] = useState<SaleHistory[]>([]);
   const [salesStats, setSalesStats] = useState<{ lifetime_value: string; total_orders: string } | null>(null);
   const [salesLoading, setSalesLoading] = useState(false);
@@ -204,6 +205,36 @@ function CustomerDrawer({
       }
     } catch { /* ignore */ }
     setCepLoading(false);
+  };
+ 
+  const lookupCnpj = async () => {
+    if (form.person_type !== 'PJ') return;
+    const cnpj = form.document?.replace(/\D/g, '');
+    if (!cnpj || cnpj.length !== 14) return;
+    setCnpjLoading(true);
+    try {
+      const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      const d = await r.json();
+      if (r.ok) {
+        setForm(p => ({
+          ...p,
+          name: d.razao_social || d.nome_fantasia || p.name,
+          email: d.email || p.email,
+          phone: d.ddd_telefone_1 || p.phone,
+          address: {
+            ...p.address,
+            cep: d.cep || p.address?.cep,
+            logradouro: d.logradouro || p.address?.logradouro,
+            numero: d.numero || p.address?.numero,
+            complemento: d.complemento || p.address?.complemento,
+            bairro: d.bairro || p.address?.bairro,
+            cidade: d.municipio || p.address?.cidade,
+            estado: d.uf || p.address?.estado,
+          }
+        }));
+      }
+    } catch { /* ignore */ }
+    setCnpjLoading(false);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -301,7 +332,21 @@ function CustomerDrawer({
                   </div>
                   <div>
                     <label className={labelCls}>{form.person_type === 'PF' ? 'CPF' : 'CNPJ'}</label>
-                    <input value={form.document || ''} onChange={set('document')} placeholder={form.person_type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'} className={inputCls} />
+                    <div className="flex gap-2">
+                      <input 
+                        value={form.document || ''} 
+                        onChange={set('document')} 
+                        onBlur={lookupCnpj}
+                        placeholder={form.person_type === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'} 
+                        className={inputCls} 
+                      />
+                      {form.person_type === 'PJ' && (
+                        <button type="button" onClick={lookupCnpj}
+                          className="px-3 py-2 border border-zinc-200 rounded-lg text-xs text-zinc-600 hover:bg-zinc-50 flex items-center gap-1 shrink-0">
+                          {cnpjLoading ? <RefreshCw size={14} className="animate-spin" /> : 'Consultar'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {form.person_type === 'PF' && (
                     <div>

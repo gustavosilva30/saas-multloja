@@ -50,6 +50,12 @@ const ALL_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Produtividade', icon: Sparkles,
+    items: [
+      { id: 'mapa_mental', icon: Brain, label: 'Mapa Mental', path: '/mapa-mental' },
+    ],
+  },
+  {
     label: 'Configurações', icon: Cog,
     items: [
       { id: 'modules', icon: Component, label: 'App Store', path: '/modules' },
@@ -72,8 +78,12 @@ function NavGroupComponent({
   defaultOpen: boolean;
 }) {
   const visible = group.items.filter(i => {
-     // For this specific request, we show the requested items regardless of activeModules for demo purposes
-     return true; 
+    // Core modules always visible
+    const core = ['dashboard', 'pos', 'customers', 'finance', 'services', 'modules', 'settings', 'stock'];
+    if (core.includes(i.id)) return true;
+    
+    // Others check against active modules
+    return activeModules.includes(i.id);
   });
   const [open, setOpen] = useState(defaultOpen);
 

@@ -5,7 +5,7 @@ import {
   Bell, Search, Moon, Sun, Monitor, Component, Wrench, FileSearch,
   Ticket, Zap, Mic, Store, Megaphone, Smartphone, Image as ImageIcon,
   MessageSquare, CalendarDays, Truck, ShieldCheck, CarFront, CreditCard,
-  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone, Heart, FileText,
+  ChevronDown, Menu, Folder, ShoppingBag, Cog, FileQuestion, Wrench as WrenchIcon, Sparkles, Phone, Heart, FileText, Brain,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTheme } from "../contexts/ThemeContext";
@@ -41,8 +41,10 @@ const ALL_GROUPS: NavGroup[] = [
     items: [
       { id: 'customers', icon: Users, label: 'Clientes', path: '/customers' },
       { id: 'finance', icon: BarChart3, label: 'Financeiro', path: '/finance' },
+      { id: 'pos', icon: FileText, label: 'Orçamentos', path: '/quotes' },
       { id: 'services', icon: WrenchIcon, label: 'Serviços/OS', path: '/services' },
       { id: 'events', icon: Ticket, label: 'Eventos', path: '/events' },
+      { id: 'mapa_mental', icon: Brain, label: 'Mapa Mental', path: '/mapa-mental' },
     ],
   },
   {

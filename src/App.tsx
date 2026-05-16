@@ -26,7 +26,10 @@ import { PlateCheck } from './pages/PlateCheck';
 import { BinCheck } from './pages/BinCheck';
 import { WhatsApp } from './pages/WhatsApp';
 import { FileConverter } from './pages/FileConverter';
+import { MapaMental } from './pages/MapaMental';
+import { MapaMentalEditor } from './pages/MapaMentalEditor';
 import { OsPublicView } from './pages/OsPublicView';
+import { Quotes } from './pages/Quotes';
 import { EventScanner } from './pages/EventScanner';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -69,6 +72,7 @@ function RouterConfig() {
         <Route path="/family" element={<ProtectedRoute minimumRoleLevel={2}><FamilyHub /></ProtectedRoute>} />
         <Route path="/ecommerce" element={<ProtectedRoute><Ecommerce /></ProtectedRoute>} />
         <Route path="/services" element={<ProtectedRoute requiredPermission="canManageStock"><Services /></ProtectedRoute>} />
+        <Route path="/quotes" element={<ProtectedRoute requiredPermission="canCreateSales"><Quotes /></ProtectedRoute>} />
         <Route path="/automations" element={<ProtectedRoute minimumRoleLevel={3}><Automations /></ProtectedRoute>} />
         <Route path="/ai-assistant" element={<ProtectedRoute minimumRoleLevel={3}><AIAssistant /></ProtectedRoute>} />
         <Route path="/ecommerce" element={<ProtectedRoute minimumRoleLevel={3}><Ecommerce /></ProtectedRoute>} />
@@ -83,6 +87,8 @@ function RouterConfig() {
         <Route path="/plate-check" element={<ProtectedRoute minimumRoleLevel={2}><PlateCheck /></ProtectedRoute>} />
         <Route path="/bin-check" element={<ProtectedRoute minimumRoleLevel={2}><BinCheck /></ProtectedRoute>} />
         <Route path="/whatsapp" element={<ProtectedRoute minimumRoleLevel={2}><WhatsApp /></ProtectedRoute>} />
+        <Route path="/mapa-mental" element={<ProtectedRoute minimumRoleLevel={3}><MapaMental /></ProtectedRoute>} />
+        <Route path="/mapa-mental/:id" element={<ProtectedRoute minimumRoleLevel={3}><MapaMentalEditor /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

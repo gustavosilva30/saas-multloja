@@ -152,6 +152,10 @@ router.post(
     body('expected_at').optional({ nullable: true }).isISO8601(),
     body('internal_notes').optional().isString(),
     body('customer_notes').optional().isString(),
+    body('guest_name').optional().isString(),
+    body('guest_phone').optional().isString(),
+    body('guest_document').optional().isString(),
+    body('guest_address').optional().isString(),
     ...itemValidators,
   ],
   async (req: Request, res: Response): Promise<void> => {
@@ -180,6 +184,10 @@ router.put(
     body('expected_at').optional({ nullable: true }).isISO8601(),
     body('internal_notes').optional().isString(),
     body('customer_notes').optional().isString(),
+    body('guest_name').optional().isString(),
+    body('guest_phone').optional().isString(),
+    body('guest_document').optional().isString(),
+    body('guest_address').optional().isString(),
     ...itemValidators.map(v => v.optional()),
   ],
   async (req: Request, res: Response): Promise<void> => {

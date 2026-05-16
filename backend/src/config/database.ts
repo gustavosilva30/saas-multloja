@@ -251,6 +251,44 @@ export async function runMigrations(): Promise<void> {
       ON CONFLICT (slug) DO NOTHING
     `);
 
+    // ── Mapa Mental ─────────────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mind_maps (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        owner_id    UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
+        title       VARCHAR(200) NOT NULL,
+        description TEXT,
+        template    VARCHAR(50),
+        data        JSONB NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_mind_maps_tenant ON mind_maps(tenant_id)`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mind_map_versions (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        map_id      UUID NOT NULL REFERENCES mind_maps(id) ON DELETE CASCADE,
+        tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        snapshot    JSONB NOT NULL,
+        created_by  UUID REFERENCES user_profiles(id) ON DELETE SET NULL,
+        created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_mind_map_versions_map ON mind_map_versions(map_id)`);
+
+    await client.query(`
+      INSERT INTO module_catalog (module_id, name, description, category, price, is_free, sort_order)
+      VALUES ('mapa_mental', 'Mapa Mental', 'Mapas mentais alimentados pelos dados reais da loja — ideal para planos estratégicos, reuniões de resultado e apresentações', 'Gestão', 49.90, false, 25)
+      ON CONFLICT (module_id) DO UPDATE SET
+        name        = EXCLUDED.name,
+        description = EXCLUDED.description,
+        category    = EXCLUDED.category,
+        sort_order  = EXCLUDED.sort_order
+    `);
+
     console.log('✅ Database migrations applied');
   } catch (err) {
     console.error('❌ Migration error:', err);

@@ -25,8 +25,13 @@ interface Product {
 interface Customer { id: string; name: string; document?: string; phone?: string; }
 
 interface CartItem {
-  product: Product;
+  id: string; // Unique ID for cart item (can be product.id or random for avulso)
+  product?: Product;
   quantity: number;
+  // Avulso fields
+  isAvulso?: boolean;
+  name?: string;
+  price?: number;
 }
 
 type PaymentMethod = 'cash' | 'debit_card' | 'credit_card' | 'pix' | 'boleto' | 'cheque' | 'customer_credit' | 'internal_credit';
@@ -108,22 +113,216 @@ function CustomerPicker({ onClose, onSelect }: { onClose: () => void; onSelect: 
 
 // ── Sale Success Modal ────────────────────────────────────────────────────────
 
-function SuccessModal({ total, onClose }: { total: number; onClose: () => void }) {
+import { QuotePrint } from '../components/QuotePrint';
+
+function SuccessModal({ total, onClose, type = 'sale', data }: { total: number; onClose: () => void; type?: 'sale' | 'budget', data?: any }) {
+  const [showPrint, setShowPrint] = useState<'A4' | 'Thermal' | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = (type: 'A4' | 'Thermal') => {
+    setShowPrint(type);
+    setTimeout(() => {
+      const content = printRef.current?.innerHTML;
+      if (!content) return;
+      
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Impressão de Orçamento</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              @media print {
+                body { margin: 0; padding: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body onload="window.print(); window.close();">
+            ${content}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setShowPrint(null);
+    }, 100);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center" onClick={e => e.stopPropagation()}>
         <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
           <Check size={32} className="text-emerald-600" strokeWidth={3} />
         </div>
-        <h3 className="font-bold text-lg text-zinc-800 mb-1">Venda Realizada!</h3>
-        <p className="text-sm text-zinc-500 mb-1">Total recebido</p>
+        <h3 className="font-bold text-lg text-zinc-800 mb-1">{type === 'sale' ? 'Venda Realizada!' : 'Orçamento Gerado!'}</h3>
+        <p className="text-sm text-zinc-500 mb-1">{type === 'sale' ? 'Total recebido' : 'Valor total'}</p>
         <p className="text-3xl font-bold text-emerald-600 mb-6">{fmtBRL(total)}</p>
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
-        >
-          Nova Venda
-        </button>
+        
+        <div className="space-y-2">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+          >
+            {type === 'sale' ? 'Nova Venda' : 'Novo Orçamento / Venda'}
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handlePrint('Thermal')}
+              className="py-2.5 rounded-lg border border-zinc-200 text-zinc-600 text-sm font-semibold hover:bg-zinc-50 flex items-center justify-center gap-2"
+            >
+              <Receipt size={14} /> Térmico
+            </button>
+            <button
+              onClick={() => handlePrint('A4')}
+              className="py-2.5 rounded-lg border border-zinc-200 text-zinc-600 text-sm font-semibold hover:bg-zinc-50 flex items-center justify-center gap-2"
+            >
+              <FileCheck2 size={14} /> A4 (PDF)
+            </button>
+          </div>
+        </div>
+
+        {/* Hidden Print Content */}
+        <div className="hidden">
+          <div ref={printRef}>
+            {showPrint && data && (
+              <QuotePrint 
+                type={showPrint} 
+                tenant={data.tenant} 
+                quote={data.quote} 
+                items={data.items} 
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AvulsoModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, price: number) => void }) {
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name || !price) return;
+    onAdd(name, parseFloat(price));
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <h3 className="font-bold text-lg text-zinc-800 mb-4">Adicionar Item Avulso</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-500 mb-1">Descrição</label>
+            <input
+              autoFocus
+              required
+              value={name} onChange={e => setName(e.target.value)}
+              placeholder="Ex: Peça sob encomenda, Mão de obra..."
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-500 mb-1">Preço Unitário (R$)</label>
+            <input
+              required
+              type="number" step="0.01" min="0"
+              value={price} onChange={e => setPrice(e.target.value)}
+              placeholder="0,00"
+              className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2 rounded-lg border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50">
+              Cancelar
+            </button>
+            <button type="submit" className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">
+              Adicionar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BudgetModal({ onClose, onConfirm, initialData }: { 
+  onClose: () => void; 
+  onConfirm: (data: any) => void;
+  initialData?: Customer | null;
+}) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [phone, setPhone] = useState(initialData?.phone || '');
+  const [document, setDocument] = useState(initialData?.document || '');
+  const [notes, setNotes] = useState('');
+  const [validity, setValidity] = useState('30');
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    onConfirm({ name, phone, document, notes, validity: parseInt(validity) });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <h3 className="font-bold text-zinc-800">Dados do Orçamento</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Nome do Cliente</label>
+              <input
+                autoFocus required
+                value={name} onChange={e => setName(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Telefone</label>
+              <input
+                value={phone} onChange={e => setPhone(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 mb-1">CPF/CNPJ</label>
+              <input
+                value={document} onChange={e => setDocument(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Validade (Dias)</label>
+              <select 
+                value={validity} onChange={e => setValidity(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none"
+              >
+                <option value="7">7 dias</option>
+                <option value="15">15 dias</option>
+                <option value="30">30 dias</option>
+                <option value="60">60 dias</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Observações</label>
+              <textarea
+                rows={3}
+                value={notes} onChange={e => setNotes(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 resize-none"
+              />
+            </div>
+          </div>
+          <button type="submit" className="w-full py-3 mt-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100">
+            Gerar Orçamento Profissional
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -144,7 +343,9 @@ export function POS() {
   const [discountMode, setDiscountMode] = useState<'value' | 'percent'>('value');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [successTotal, setSuccessTotal] = useState<number | null>(null);
+  const [successData, setSuccessData] = useState<any>(null);
+  const [showAvulsoModal, setShowAvulsoModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -170,33 +371,46 @@ export function POS() {
   const addToCart = (p: Product) => {
     if (p.stock_quantity <= 0) { setError(`${p.name} está sem estoque`); setTimeout(() => setError(''), 2500); return; }
     setCart(prev => {
-      const existing = prev.find(i => i.product.id === p.id);
+      const existing = prev.find(i => i.product?.id === p.id);
       if (existing) {
         if (existing.quantity >= p.stock_quantity) {
           setError(`Estoque máximo de ${p.name} atingido`); setTimeout(() => setError(''), 2500);
           return prev;
         }
-        return prev.map(i => i.product.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i.product?.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
-      return [...prev, { product: p, quantity: 1 }];
+      return [...prev, { id: p.id, product: p, quantity: 1 }];
     });
+  };
+
+  const addAvulso = (name: string, price: number) => {
+    setCart(prev => [...prev, { 
+      id: `avulso-${Date.now()}`, 
+      isAvulso: true, 
+      name, 
+      price, 
+      quantity: 1 
+    }]);
   };
 
   const updateQuantity = (id: string, delta: number) =>
     setCart(prev => prev.flatMap(i => {
-      if (i.product.id !== id) return [i];
+      if (i.id !== id) return [i];
       const newQty = i.quantity + delta;
       if (newQty <= 0) return [];
-      if (newQty > i.product.stock_quantity) {
+      if (!i.isAvulso && i.product && newQty > i.product.stock_quantity) {
         setError(`Estoque máximo: ${i.product.stock_quantity}`); setTimeout(() => setError(''), 2500);
         return [i];
       }
       return [{ ...i, quantity: newQty }];
     }));
 
-  const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.product.id !== id));
+  const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const subtotal = cart.reduce((s, i) => s + i.product.sale_price * i.quantity, 0);
+  const subtotal = cart.reduce((s, i) => {
+    const itemPrice = i.isAvulso ? (i.price || 0) : (i.product?.sale_price || 0);
+    return s + itemPrice * i.quantity;
+  }, 0);
   const discountValue = discountMode === 'percent' ? (subtotal * discount) / 100 : discount;
   const total = Math.max(0, subtotal - discountValue);
 
@@ -210,12 +424,18 @@ export function POS() {
     setError('');
     try {
       const body = {
-        items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity, unit_price: i.product.sale_price })),
+        items: cart.map(i => ({ 
+          product_id: i.product?.id, 
+          quantity: i.quantity, 
+          unit_price: i.isAvulso ? i.price : i.product?.sale_price,
+          descricao_avulso: i.isAvulso ? i.name : null
+        })),
         customer_id: customer?.id,
         payment_method: paymentMethod,
         discount: discountValue,
       };
       await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
+      setSuccessType('sale');
       setSuccessTotal(total);
       setCart([]);
       setDiscount(0);
@@ -223,6 +443,49 @@ export function POS() {
       loadProducts(); // refresh stock
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao finalizar venda');
+    }
+    setSubmitting(false);
+  };
+
+  const finalizeBudget = async (budgetData: any) => {
+    if (cart.length === 0) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const body = {
+        items: cart.map(i => ({ 
+          product_id: i.product?.id, 
+          description: i.isAvulso ? i.name : i.product?.name,
+          quantity: i.quantity, 
+          unit_price: i.isAvulso ? i.price : i.product?.sale_price,
+          is_adhoc: i.isAvulso || false
+        })),
+        customer_id: customer?.id,
+        guest_name: budgetData.name,
+        guest_phone: budgetData.phone,
+        guest_document: budgetData.document,
+        notes: budgetData.notes,
+        validity_days: budgetData.validity,
+        discount: discountValue,
+      };
+      const { quote } = await apiFetch<{ quote: any }>('/api/quotes', { method: 'POST', body: JSON.stringify(body) });
+      
+      // Fetch tenant info for printing
+      const { tenant } = await apiFetch<{ tenant: any }>('/api/tenants/me');
+
+      setSuccessData({
+        total,
+        type: 'budget',
+        quote,
+        items: body.items,
+        tenant
+      });
+      setCart([]);
+      setDiscount(0);
+      setCustomer(null);
+      setShowBudgetModal(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar orçamento');
     }
     setSubmitting(false);
   };
@@ -238,15 +501,23 @@ export function POS() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            autoFocus
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nome, SKU ou código de barras"
-            className="w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 placeholder:text-zinc-400"
-          />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              autoFocus
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por nome, SKU ou código de barras"
+              className="w-full pl-10 pr-3 py-2.5 bg-white border border-zinc-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 placeholder:text-zinc-400"
+            />
+          </div>
+          <button 
+            onClick={() => setShowAvulsoModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-xl text-sm font-medium transition-colors shrink-0"
+          >
+            <Plus size={16} />
+            <span>Item Avulso</span>
+          </button>
         </div>
 
         {/* Products grid */}
@@ -348,35 +619,41 @@ export function POS() {
             </div>
           ) : (
             <ul className="divide-y divide-zinc-100">
-              {cart.map(({ product, quantity }) => (
-                <li key={product.id} className="px-4 py-3 flex gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-100 overflow-hidden shrink-0 flex items-center justify-center">
-                    {product.image_url
-                      ? <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                      : <Package size={16} className="text-zinc-300" />
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-800 line-clamp-1">{product.name}</p>
-                    <p className="text-xs text-zinc-400 mb-1.5">{fmtBRL(product.sale_price)} × {quantity}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center bg-zinc-50 border border-zinc-200 rounded-md">
-                        <button onClick={() => updateQuantity(product.id, -1)} className="p-1 text-zinc-500 hover:text-zinc-800">
-                          <Minus size={12} />
-                        </button>
-                        <span className="px-2 text-xs font-bold w-7 text-center">{quantity}</span>
-                        <button onClick={() => updateQuantity(product.id, 1)} className="p-1 text-zinc-500 hover:text-zinc-800">
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      <span className="text-sm font-bold text-zinc-800">{fmtBRL(product.sale_price * quantity)}</span>
+              {cart.map((item) => {
+                const name = item.isAvulso ? item.name : item.product?.name;
+                const price = item.isAvulso ? (item.price || 0) : (item.product?.sale_price || 0);
+                const imageUrl = item.product?.image_url;
+
+                return (
+                  <li key={item.id} className="px-4 py-3 flex gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-zinc-50 border border-zinc-100 overflow-hidden shrink-0 flex items-center justify-center">
+                      {imageUrl
+                        ? <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                        : <Package size={16} className="text-zinc-300" />
+                      }
                     </div>
-                  </div>
-                  <button onClick={() => removeFromCart(product.id)} className="text-zinc-300 hover:text-red-500 self-start p-1">
-                    <Trash2 size={13} />
-                  </button>
-                </li>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-zinc-800 line-clamp-1">{name}</p>
+                      <p className="text-xs text-zinc-400 mb-1.5">{fmtBRL(price)} × {item.quantity}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center bg-zinc-50 border border-zinc-200 rounded-md">
+                          <button onClick={() => updateQuantity(item.id, -1)} className="p-1 text-zinc-500 hover:text-zinc-800">
+                            <Minus size={12} />
+                          </button>
+                          <span className="px-2 text-xs font-bold w-7 text-center">{item.quantity}</span>
+                          <button onClick={() => updateQuantity(item.id, 1)} className="p-1 text-zinc-500 hover:text-zinc-800">
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                        <span className="text-sm font-bold text-zinc-800">{fmtBRL(price * item.quantity)}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => removeFromCart(item.id)} className="text-zinc-300 hover:text-red-500 self-start p-1">
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -459,13 +736,23 @@ export function POS() {
               )}
             </div>
 
-            <button
-              type="submit" disabled={submitting}
-              className="w-full py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
-            >
-              <Receipt size={16} />
-              {submitting ? 'Processando…' : `Finalizar Venda · ${fmtBRL(total)}`}
-            </button>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowBudgetModal(true)}
+                className="flex-1 py-3 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                Gerar Orçamento
+              </button>
+              <button
+                type="submit" disabled={submitting}
+                className="flex-[2] py-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Receipt size={16} />
+                {submitting ? 'Processando…' : `Finalizar Venda`}
+              </button>
+            </div>
           </form>
         )}
       </aside>
@@ -477,8 +764,28 @@ export function POS() {
         />
       )}
 
-      {successTotal !== null && (
-        <SuccessModal total={successTotal} onClose={() => setSuccessTotal(null)} />
+      {showAvulsoModal && (
+        <AvulsoModal
+          onClose={() => setShowAvulsoModal(false)}
+          onAdd={addAvulso}
+        />
+      )}
+
+      {showBudgetModal && (
+        <BudgetModal
+          onClose={() => setShowBudgetModal(false)}
+          onConfirm={finalizeBudget}
+          initialData={customer}
+        />
+      )}
+
+      {successData && (
+        <SuccessModal 
+          total={successData.total} 
+          type={successData.type}
+          data={successData}
+          onClose={() => setSuccessData(null)} 
+        />
       )}
     </div>
   );

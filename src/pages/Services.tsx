@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Wrench, Plus, Search, Clock, CheckCircle2, AlertCircle, XCircle,
   Calendar, User, DollarSign, ExternalLink, Loader2, Edit2,
-  X, Package, ChevronDown, Trash2, PlusCircle, Tag,
+  X, Package, ChevronDown, Trash2, PlusCircle, Tag, Printer, Receipt
 } from 'lucide-react';
+import { QuotePrint } from '../components/QuotePrint';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 
@@ -191,9 +192,10 @@ function NewOsModal({ onClose, onCreated }: {
   const [customerNotes, setCustomerNotes] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [items, setItems] = useState<OsItem[]>([]);
-  const [assetFields, setAssetFields] = useState<{ key: string; value: string }[]>([
-    { key: '', value: '' },
-  ]);
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestDocument, setGuestDocument] = useState('');
+  const [guestAddress, setGuestAddress] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -231,6 +233,10 @@ function NewOsModal({ onClose, onCreated }: {
         method: 'POST',
         body: {
           customer_id: customer?.id,
+          guest_name: guestName || undefined,
+          guest_phone: guestPhone || undefined,
+          guest_document: guestDocument || undefined,
+          guest_address: guestAddress || undefined,
           expected_at: expectedAt || undefined,
           customer_notes: customerNotes || undefined,
           internal_notes: internalNotes || undefined,
@@ -266,9 +272,33 @@ function NewOsModal({ onClose, onCreated }: {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
           {/* Cliente */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Cliente</label>
-            <CustomerSearch value={customer} onChange={setCustomer} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Cliente Cadastrado</label>
+              <CustomerSearch value={customer} onChange={setCustomer} />
+            </div>
+            {!customer && (
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">Ou Cliente Avulso</label>
+                <input
+                  value={guestName} onChange={e => setGuestName(e.target.value)}
+                  placeholder="Nome do cliente..."
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none dark:text-white"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={guestPhone} onChange={e => setGuestPhone(e.target.value)}
+                    placeholder="Telefone..."
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none dark:text-white"
+                  />
+                  <input
+                    value={guestDocument} onChange={e => setGuestDocument(e.target.value)}
+                    placeholder="CPF/CNPJ..."
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm focus:outline-none dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Dados do ativo (JSONB livre) */}
@@ -481,6 +511,10 @@ function NewOsModal({ onClose, onCreated }: {
                     method: 'POST',
                     body: {
                       customer_id: customer?.id,
+                      guest_name: guestName || undefined,
+                      guest_phone: guestPhone || undefined,
+                      guest_document: guestDocument || undefined,
+                      guest_address: guestAddress || undefined,
                       expected_at: expectedAt || undefined,
                       customer_notes: customerNotes || undefined,
                       internal_notes: internalNotes || undefined,
@@ -506,13 +540,123 @@ function NewOsModal({ onClose, onCreated }: {
               title={!customer ? 'Selecione um cliente para enviar aprovação' : ''}
             >
               {saving ? <Loader2 size={15} className="animate-spin" /> : null}
-              Enviar para Aprovação
+              Enviado p/ Aprovação
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function OSPrintButton({ osId }: { osId: string }) {
+  const [printing, setPrinting] = useState<'A4' | 'Thermal' | null>(null);
+
+  const handlePrint = async (type: 'A4' | 'Thermal') => {
+    try {
+      const { service_order } = await apiFetch<{ service_order: any }>(`/api/service-orders/${osId}`);
+      const { tenant } = await apiFetch<{ tenant: any }>('/api/tenants/me');
+      
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      // Transform OS to Quote structure for the template
+      const quoteData = {
+        quote_number: service_order.os_number,
+        created_at: service_order.created_at,
+        display_name: service_order.customer_name || service_order.guest_name,
+        guest_phone: service_order.customer_phone || service_order.guest_phone,
+        guest_document: service_order.guest_document,
+        guest_address: service_order.guest_address,
+        subtotal: service_order.subtotal,
+        discount: service_order.discount,
+        total: service_order.total,
+        validity_days: 15,
+        notes: service_order.customer_notes,
+        status: service_order.status,
+        user_name: service_order.assignee_name
+      };
+
+      // Component will be rendered in the new window
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>OS Orçamento</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+          </head>
+          <body onload="window.print(); window.close();">
+            <div id="print-root"></div>
+          </body>
+        </html>
+      `);
+
+      // We use a simplified version or just raw HTML since React rendering across windows is tricky
+      // For speed, let's use a standard HTML template here or a hidden component
+      // I'll use a simpler approach: render a hidden div in current page and grab its HTML
+      setPrinting(type);
+      setTimeout(() => {
+        const content = document.getElementById('os-print-content')?.innerHTML;
+        printWindow.document.getElementById('print-root')!.innerHTML = content || '';
+        printWindow.document.close();
+        setPrinting(null);
+      }, 100);
+
+    } catch (err) {
+      console.error('Print OS error:', err);
+    }
+  };
+
+  return (
+    <div className="flex gap-1">
+      <button onClick={() => handlePrint('Thermal')} className="p-2 text-zinc-400 hover:text-indigo-500 rounded-lg transition-all" title="Cupom Térmico">
+        <Receipt size={16} />
+      </button>
+      <button onClick={() => handlePrint('A4')} className="p-2 text-zinc-400 hover:text-emerald-500 rounded-lg transition-all" title="Imprimir A4">
+        <Printer size={16} />
+      </button>
+      
+      <div className="hidden">
+        <div id="os-print-content">
+          {printing && (
+            <QuotePrintPlaceholder osId={osId} type={printing} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Utility to fetch and render for printing
+function QuotePrintPlaceholder({ osId, type }: { osId: string, type: 'A4' | 'Thermal' }) {
+  const [data, setData] = useState<any>(null);
+  useEffect(() => {
+    Promise.all([
+      apiFetch<any>(`/api/service-orders/${osId}`),
+      apiFetch<any>('/api/tenants/me')
+    ]).then(([os, t]) => {
+      setData({ os: os.service_order, tenant: t.tenant });
+    });
+  }, [osId]);
+
+  if (!data) return null;
+
+  const quote = {
+    quote_number: data.os.os_number,
+    created_at: data.os.created_at,
+    display_name: data.os.customer_name || data.os.guest_name,
+    guest_phone: data.os.customer_phone || data.os.guest_phone,
+    guest_document: data.os.guest_document,
+    guest_address: data.os.guest_address,
+    subtotal: data.os.subtotal,
+    discount: data.os.discount,
+    total: data.os.total,
+    validity_days: 15,
+    notes: data.os.customer_notes,
+    status: data.os.status,
+    user_name: data.os.assignee_name
+  };
+
+  return <QuotePrint type={type} tenant={data.tenant} quote={quote} items={data.os.items} />;
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -677,6 +821,9 @@ export function Services() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {(os.status === 'DRAFT' || os.status === 'PENDING_APPROVAL') && (
+                            <OSPrintButton osId={os.id} />
+                          )}
                           <button className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all" title="Ver detalhes">
                             <ExternalLink size={16} />
                           </button>

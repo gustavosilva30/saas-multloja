@@ -111,13 +111,10 @@ async function notifyWhatsApp(
 export async function createOs(
   tenantId: string,
   userId: string,
-  data: {
-    customer_id?: string;
-    assignee_id?: string;
-    asset_metadata?: Record<string, unknown>;
-    expected_at?: string;
-    internal_notes?: string;
-    customer_notes?: string;
+    guest_name?: string;
+    guest_phone?: string;
+    guest_document?: string;
+    guest_address?: string;
     items: OsItemInput[];
   }
 ) {
@@ -130,11 +127,13 @@ export async function createOs(
       `INSERT INTO service_orders
          (tenant_id, customer_id, assignee_id, os_number,
           asset_metadata, expected_at, internal_notes, customer_notes,
-          subtotal, discount, total)
+          subtotal, discount, total,
+          guest_name, guest_phone, guest_document, guest_address)
        VALUES
          ($1, $2, $3, next_os_number($1),
           $4, $5, $6, $7,
-          $8, $9, $10)
+          $8, $9, $10,
+          $11, $12, $13, $14)
        RETURNING *`,
       [
         tenantId,
@@ -145,6 +144,10 @@ export async function createOs(
         data.internal_notes ?? null,
         data.customer_notes ?? null,
         subtotal, discount, total,
+        data.guest_name ?? null,
+        data.guest_phone ?? null,
+        data.guest_document ?? null,
+        data.guest_address ?? null,
       ]
     );
     const os = osRes.rows[0];
@@ -178,13 +181,10 @@ export async function createOs(
 export async function updateOs(
   osId: string,
   tenantId: string,
-  data: {
-    customer_id?: string;
-    assignee_id?: string;
-    asset_metadata?: Record<string, unknown>;
-    expected_at?: string;
-    internal_notes?: string;
-    customer_notes?: string;
+    guest_name?: string;
+    guest_phone?: string;
+    guest_document?: string;
+    guest_address?: string;
     items?: OsItemInput[];
   }
 ) {
@@ -211,6 +211,10 @@ export async function updateOs(
     if (data.expected_at   !== undefined) addField('expected_at',   data.expected_at);
     if (data.internal_notes !== undefined) addField('internal_notes', data.internal_notes);
     if (data.customer_notes !== undefined) addField('customer_notes', data.customer_notes);
+    if (data.guest_name     !== undefined) addField('guest_name',     data.guest_name);
+    if (data.guest_phone    !== undefined) addField('guest_phone',    data.guest_phone);
+    if (data.guest_document !== undefined) addField('guest_document', data.guest_document);
+    if (data.guest_address  !== undefined) addField('guest_address',  data.guest_address);
 
     if (data.items) {
       await client.query(`DELETE FROM service_order_items WHERE os_id = $1`, [osId]);
@@ -269,7 +273,9 @@ export async function updateOsStatus(
   const result = await withTransaction(async (client: PoolClient) => {
     const osRes = await client.query(
       `SELECT so.id, so.tenant_id, so.status, so.os_number, so.total, so.access_token,
-              c.phone AS customer_phone, c.whatsapp AS customer_whatsapp, c.name AS customer_name
+              COALESCE(c.phone, so.guest_phone) AS customer_phone, 
+              COALESCE(c.whatsapp, so.guest_phone) AS customer_whatsapp, 
+              COALESCE(c.name, so.guest_name) AS customer_name
          FROM service_orders so
          LEFT JOIN customers c ON c.id = so.customer_id
         WHERE so.id = $1 AND so.tenant_id = $2

@@ -111,6 +111,13 @@ async function notifyWhatsApp(
 export async function createOs(
   tenantId: string,
   userId: string,
+  data: {
+    customer_id?: string;
+    assignee_id?: string;
+    asset_metadata?: Record<string, unknown>;
+    expected_at?: string;
+    internal_notes?: string;
+    customer_notes?: string;
     guest_name?: string;
     guest_phone?: string;
     guest_document?: string;
@@ -181,6 +188,13 @@ export async function createOs(
 export async function updateOs(
   osId: string,
   tenantId: string,
+  data: {
+    customer_id?: string;
+    assignee_id?: string;
+    asset_metadata?: Record<string, unknown>;
+    expected_at?: string;
+    internal_notes?: string;
+    customer_notes?: string;
     guest_name?: string;
     guest_phone?: string;
     guest_document?: string;
